@@ -4,7 +4,7 @@
 PlayerSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 28
-  productGUID: e67c97d2d8ec716459d9f5b2f04d0918
+  productGUID: b84d822e477b8194293db2a3f057855f
   AndroidProfiler: 0
   AndroidFilterTouchesWhenObscured: 0
   AndroidEnableSustainedPerformanceMode: 0
@@ -13,7 +13,7 @@ PlayerSettings:
   useOnDemandResources: 0
   accelerometerFrequency: 60
   companyName: DefaultCompany
-  productName: Reverse_Turing_Test_TEMP
+  productName: RevTest
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
@@ -826,7 +826,25 @@ PlayerSettings:
   webGLCloseOnQuit: 0
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
-  scriptingDefineSymbols: {}
+  scriptingDefineSymbols:
+    Android: CONVAI_URP_CONVERTER_INSTALLED
+    EmbeddedLinux: CONVAI_URP_CONVERTER_INSTALLED
+    GameCoreScarlett: CONVAI_URP_CONVERTER_INSTALLED
+    GameCoreXboxOne: CONVAI_URP_CONVERTER_INSTALLED
+    Kepler: CONVAI_URP_CONVERTER_INSTALLED
+    LinuxHeadlessSimulation: CONVAI_URP_CONVERTER_INSTALLED
+    Nintendo Switch: CONVAI_URP_CONVERTER_INSTALLED
+    Nintendo Switch 2: CONVAI_URP_CONVERTER_INSTALLED
+    PS4: CONVAI_URP_CONVERTER_INSTALLED
+    PS5: CONVAI_URP_CONVERTER_INSTALLED
+    QNX: CONVAI_URP_CONVERTER_INSTALLED
+    Standalone: CONVAI_URP_CONVERTER_INSTALLED
+    VisionOS: CONVAI_URP_CONVERTER_INSTALLED
+    WebGL: CONVAI_URP_CONVERTER_INSTALLED
+    Windows Store Apps: CONVAI_URP_CONVERTER_INSTALLED
+    XboxOne: CONVAI_URP_CONVERTER_INSTALLED
+    iPhone: CONVAI_URP_CONVERTER_INSTALLED
+    tvOS: CONVAI_URP_CONVERTER_INSTALLED
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
@@ -847,14 +865,14 @@ PlayerSettings:
   editorAssembliesCompatibilityLevel: 1
   m_RenderingPath: 1
   m_MobileRenderingPath: 1
-  metroPackageName: Reverse_Turing_Test_TEMP
+  metroPackageName: RevTest
   metroPackageVersion: 
   metroCertificatePath: 
   metroCertificatePassword: 
   metroCertificateSubject: 
   metroCertificateIssuer: 
   metroCertificateNotAfter: 0000000000000000
-  metroApplicationDescription: Reverse_Turing_Test_TEMP
+  metroApplicationDescription: RevTest
   wsaImages: {}
   metroTileShortName: 
   metroTileShowName: 0
@@ -925,10 +943,10 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
-  cloudProjectId: 3a4a42d4-3945-4a83-be86-2190ee2c887d
+  cloudProjectId: d8615ad9-52f0-41e2-aa2e-d07a647351da
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: Reverse_Turing_Test_TEMP
+  projectName: RevTest
   organizationId: unity_19253776
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
