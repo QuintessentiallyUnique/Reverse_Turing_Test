@@ -301,10 +301,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b554a45e383e30c4baae89c215ec4727, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TuringGameManager
-  bots:
+  judit: {fileID: 129422508}
+  hellen: {fileID: 1971404758}
+  aiParticipants:
   - {fileID: 129422508}
   - {fileID: 1971404758}
-  totalRounds: 1
+  roundsToPlay: 1
+  startDelaySeconds: 1
+  playerIsImposter: 1
+  nonPlayerImposter: {fileID: 0}
+  playerAlias: Kanye West
+  syncAliasToConvaiProfile: 1
+  showTurnOverlay: 1
 --- !u!4 &131511624
 Transform:
   m_ObjectHideFlags: 0
