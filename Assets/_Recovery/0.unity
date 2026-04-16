@@ -129,11 +129,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 670819032993934080, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 670819032993934080, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
+      propertyPath: <TargetObject>k__BackingField
+      value: 
+      objectReference: {fileID: 2129860657}
     - target: {fileID: 1508414793250043165, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2639540652976512734, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: characterID
@@ -149,7 +153,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3192378952802963997, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3323422670716065006, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: m_IsActive
@@ -252,11 +256,8 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents:
-    - {fileID: 7849524831720735133, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-    - {fileID: 6886115979918369281, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-    - {fileID: 1508414793250043165, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-    - {fileID: 670819032993934080, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-    - {fileID: 3192378952802963997, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
+    - {fileID: 0}
+    - {fileID: 0}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -301,16 +302,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b554a45e383e30c4baae89c215ec4727, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TuringGameManager
-  judit: {fileID: 129422508}
-  hellen: {fileID: 1971404758}
   aiParticipants:
   - {fileID: 129422508}
   - {fileID: 1971404758}
   roundsToPlay: 1
   startDelaySeconds: 1
-  playerIsImposter: 1
-  nonPlayerImposter: {fileID: 0}
-  playerAlias: Kanye West
+  playerAlias: Max Verstappen
   syncAliasToConvaiProfile: 1
   showTurnOverlay: 1
 --- !u!4 &131511624
@@ -328,6 +325,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!4 &397444044 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8995187496934191307, guid: 69dd98fa71bd5e649969b163d693f61b, type: 3}
+  m_PrefabInstance: {fileID: 1157219304}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &586879261
 GameObject:
   m_ObjectHideFlags: 0
@@ -2276,11 +2278,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 670819032993934080, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 670819032993934080, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
+      propertyPath: <TargetObject>k__BackingField
+      value: 
+      objectReference: {fileID: 397444044}
     - target: {fileID: 1508414793250043165, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2639540652976512734, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: characterID
@@ -2296,7 +2302,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3192378952802963997, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3323422670716065006, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: m_IsActive
@@ -2399,14 +2405,16 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents:
-    - {fileID: 7849524831720735133, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-    - {fileID: 1508414793250043165, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-    - {fileID: 670819032993934080, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-    - {fileID: 3192378952802963997, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
+    - {fileID: 0}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
+--- !u!4 &2129860657 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3458780173217957940, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
+  m_PrefabInstance: {fileID: 1995564482}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

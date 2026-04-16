@@ -9,18 +9,12 @@ using Service;
 
 public class TuringGameManager : MonoBehaviour
 {
-    [Header("Legacy NPC Slots")]
-    public ConvaiNPC judit;
-    public ConvaiNPC hellen;
-
     [Header("AI Participants")]
     public List<ConvaiNPC> aiParticipants = new();
 
     [Header("Game Settings")]
     public int roundsToPlay = 1;
     public float startDelaySeconds = 3f;
-    public bool playerIsImposter = true;
-    public ConvaiNPC nonPlayerImposter;
 
     [Header("Player Identity")]
     public string playerAlias = "Player";
@@ -792,19 +786,6 @@ public class TuringGameManager : MonoBehaviour
                 _activeParticipants.Add(npc);
             }
         }
-
-        if (_activeParticipants.Count == 0)
-        {
-            if (judit != null)
-            {
-                _activeParticipants.Add(judit);
-            }
-
-            if (hellen != null && hellen != judit)
-            {
-                _activeParticipants.Add(hellen);
-            }
-        }
     }
 
     private void SetLastSpeech(ConvaiNPC npc, string transcript)
@@ -834,17 +815,7 @@ public class TuringGameManager : MonoBehaviour
 
     private string GetActualImposterToken()
     {
-        if (playerIsImposter)
-        {
-            return PlayerVoteToken;
-        }
-
-        if (nonPlayerImposter != null && _activeParticipants.Contains(nonPlayerImposter))
-        {
-            return GetVoteTokenForNpc(nonPlayerImposter);
-        }
-
-        return _activeParticipants.Count > 0 ? GetVoteTokenForNpc(_activeParticipants[0]) : "UNKNOWN";
+        return PlayerVoteToken;
     }
 
     private static void AddVote(Dictionary<string, int> voteCounts, string voteToken)
@@ -877,22 +848,13 @@ public class TuringGameManager : MonoBehaviour
     {
         if (voteTie)
         {
-            return playerIsImposter
-                ? "You win. The AIs did not reach a clear consensus on the hidden human."
-                : "The game ends in a tie vote with no clear winner.";
+            return "You win. The AIs did not reach a clear consensus on the hidden human.";
         }
 
         bool impostorCaught = votedWinner == actualImposter;
-        if (playerIsImposter)
-        {
-            return impostorCaught
-                ? "The bots win. They identified the hidden human."
-                : "You win. The bots chose the wrong participant.";
-        }
-
         return impostorCaught
-            ? "The table identified the hidden human correctly."
-            : "The table chose the wrong participant.";
+            ? "The bots win. They identified the hidden human."
+            : "You win. The bots chose the wrong participant.";
     }
 
     private string BuildConversationSummary()
