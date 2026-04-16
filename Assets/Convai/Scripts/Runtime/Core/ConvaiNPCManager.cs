@@ -11,6 +11,7 @@ namespace Convai.Scripts.Runtime.Core
     public class ConvaiNPCManager : MonoBehaviour
     {
         private static readonly RaycastHit[] RaycastHits = new RaycastHit[1];
+        private bool _isActiveNPCLocked;
 
         [Tooltip("Length of the ray used for detecting NPCs.")] [SerializeField]
         private float rayLength = 2.0f;
@@ -49,6 +50,11 @@ namespace Convai.Scripts.Runtime.Core
 
         private void LateUpdate()
         {
+            if (_isActiveNPCLocked)
+            {
+                return;
+            }
+
             Ray ray = new(_mainCamera.transform.position, _mainCamera.transform.forward);
             bool foundConvaiNPC = false;
 
@@ -187,6 +193,17 @@ namespace Convai.Scripts.Runtime.Core
 
                 OnActiveNPCChanged?.Invoke(newActiveNPC);
             }
+        }
+
+        public void LockActiveConvaiNPC(ConvaiNPC newActiveNPC, bool updateLastHitNPC = false)
+        {
+            _isActiveNPCLocked = true;
+            SetActiveConvaiNPC(newActiveNPC, updateLastHitNPC);
+        }
+
+        public void UnlockActiveConvaiNPC()
+        {
+            _isActiveNPCLocked = false;
         }
 
         /// <summary>

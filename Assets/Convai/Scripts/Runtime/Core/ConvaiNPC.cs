@@ -55,7 +55,7 @@ namespace Convai.Scripts.Runtime.Core
         [Tooltip("Is this character talking?")]
         [SerializeField]
         [ReadOnly]
-        private bool isCharacterTalking;
+        public bool isCharacterTalking;
 
         [Header("Session Initialization")]
         [Tooltip("Enable/disable initializing session ID by sending a text request to the server")]
