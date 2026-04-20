@@ -23,8 +23,17 @@ public class TuringGameManager : MonoBehaviour
     [Header("Overlay")]
     public bool showTurnOverlay = true;
 
+    [Header("Narration")]
+    [Tooltip("Optional Convai NPC used for spoken narration. Keep this NPC out of aiParticipants.")]
+    public ConvaiNPC narratorVoice;
+    [Tooltip("If no narrator is assigned, automatically use the single extra Convai NPC in the scene, if exactly one exists.")]
+    public bool autoUseSingleExtraNpcAsNarrator = true;
+    [Tooltip("Hide the narrator's visuals and colliders at runtime so it behaves like an unseen voice.")]
+    public bool hideNarratorVisuals = true;
+
     private const string PlayerVoteToken = "PLAYER";
     private const string PlayerNameSaveKey = "PlayerName";
+    private const float PlayerSpeechTimeoutSeconds = 30f;
 
     private bool _capturingPlayerSpeech;
     private bool _playerPressedTalkKey;
@@ -47,6 +56,7 @@ public class TuringGameManager : MonoBehaviour
     void Start()
     {
         InitializePlayerAlias();
+        InitializeNarratorVoice();
         StartCoroutine(GameLoop());
     }
 
@@ -178,9 +188,14 @@ public class TuringGameManager : MonoBehaviour
         Debug.Log("--- GAME OVER ---");
         Debug.Log(outcome);
 
-        SetTurnCue("Game Over", outcome);
-        yield return StartCoroutine(RunBotTurn(_activeParticipants[0],
-            $"The vote is over. Announce this exact result to the room in one short closing sentence: {outcome}"));
+        ConvaiNPC closingSpeaker = GetClosingNarrator();
+        if (closingSpeaker != null)
+        {
+            SetTurnCue("Game Over", outcome);
+            yield return StartCoroutine(RunBotTurn(closingSpeaker,
+                $"The vote is over. Announce this exact result to the room in one short closing sentence: {outcome}",
+                turnLabelOverride: narratorVoice != null && closingSpeaker == narratorVoice ? "Narrator" : null));
+        }
 
         if (ConvaiNPCManager.Instance != null)
         {
@@ -188,7 +203,7 @@ public class TuringGameManager : MonoBehaviour
         }
     }
 
-    IEnumerator RunBotTurn(ConvaiNPC bot, string prompt, System.Action<string> onTranscriptReady = null)
+    IEnumerator RunBotTurn(ConvaiNPC bot, string prompt, System.Action<string> onTranscriptReady = null, string turnLabelOverride = null)
     {
         if (bot == null)
         {
@@ -200,7 +215,7 @@ public class TuringGameManager : MonoBehaviour
             ConvaiNPCManager.Instance.LockActiveConvaiNPC(bot);
         }
 
-        SetTurnCue($"{bot.characterName}'s Turn", _currentTurnInstruction);
+        SetTurnCue(string.IsNullOrWhiteSpace(turnLabelOverride) ? $"{GetNpcName(bot, "Speaker")}'s Turn" : turnLabelOverride, _currentTurnInstruction);
         _botTranscriptTarget = bot;
         _botTranscriptBuffer.Clear();
 
@@ -240,51 +255,10 @@ public class TuringGameManager : MonoBehaviour
 
     IEnumerator HandlePlayerRoundTurn(ConvaiNPC listeningNpc, string instruction)
     {
-        if (listeningNpc == null)
-        {
-            yield break;
-        }
-
-        ResetPlayerSpeechCapture();
-        SetTurnCue($"{GetPlayerNameForPrompts()}'s Turn", instruction);
-        Debug.Log(instruction);
-
-        if (ConvaiNPCManager.Instance != null)
-        {
-            ConvaiNPCManager.Instance.LockActiveConvaiNPC(listeningNpc);
-        }
-
-        _capturingPlayerSpeech = true;
-
-        float timeout = 0f;
-        while (!_playerPressedTalkKey && timeout < 30f)
-        {
-            timeout += Time.deltaTime;
-            yield return null;
-        }
-
-        if (!_playerPressedTalkKey)
-        {
-            Debug.LogWarning("Player did not start speaking in time. Skipping turn.");
-            _capturingPlayerSpeech = false;
-            yield break;
-        }
-
-        timeout = 0f;
-        while (!_playerReleasedTalkKey && timeout < 30f)
-        {
-            timeout += Time.deltaTime;
-            yield return null;
-        }
-
-        timeout = 0f;
-        while (!_playerSpeechCompleted && !listeningNpc.isCharacterTalking && timeout < 30f)
-        {
-            timeout += Time.deltaTime;
-            yield return null;
-        }
-
-        _capturingPlayerSpeech = false;
+        yield return StartCoroutine(CapturePlayerSpeechWithoutBotReply(listeningNpc,
+            $"{GetPlayerNameForPrompts()}'s Turn",
+            instruction,
+            logInstruction: true));
 
         if (string.IsNullOrWhiteSpace(_lastCompletedPlayerSpeech))
         {
@@ -295,53 +269,13 @@ public class TuringGameManager : MonoBehaviour
             Debug.Log($"PLAYER SAID: {_lastCompletedPlayerSpeech}");
         }
 
-        yield return StartCoroutine(WaitForBotToFinish(listeningNpc));
     }
 
     IEnumerator CapturePlayerVoteWithoutBotReply(ConvaiNPC listeningNpc)
     {
-        if (listeningNpc == null)
-        {
-            yield break;
-        }
-
-        ResetPlayerSpeechCapture();
-        SetTurnCue($"{GetPlayerNameForPrompts()}'s Turn", $"Vote as {GetPlayerNameForPrompts()} and explain why.");
-
-        if (ConvaiNPCManager.Instance != null)
-        {
-            ConvaiNPCManager.Instance.LockActiveConvaiNPC(listeningNpc);
-        }
-
-        _capturingPlayerSpeech = true;
-
-        float timeout = 0f;
-        while (!_playerPressedTalkKey && timeout < 30f)
-        {
-            timeout += Time.deltaTime;
-            yield return null;
-        }
-
-        timeout = 0f;
-        while (!_playerReleasedTalkKey && timeout < 30f)
-        {
-            timeout += Time.deltaTime;
-            yield return null;
-        }
-
-        timeout = 0f;
-        while (!_playerSpeechCompleted && timeout < 30f)
-        {
-            timeout += Time.deltaTime;
-            yield return null;
-        }
-
-        _capturingPlayerSpeech = false;
-
-        if (ConvaiGRPCAPI.Instance != null)
-        {
-            ConvaiGRPCAPI.Instance.InterruptCharacterSpeech(listeningNpc);
-        }
+        yield return StartCoroutine(CapturePlayerSpeechWithoutBotReply(listeningNpc,
+            $"{GetPlayerNameForPrompts()}'s Turn",
+            $"Vote as {GetPlayerNameForPrompts()} and explain why."));
     }
 
     IEnumerator WaitForBotToFinish(ConvaiNPC bot)
@@ -429,7 +363,8 @@ public class TuringGameManager : MonoBehaviour
         bool hasInputManager = ConvaiInputManager.Instance != null;
         bool hasGrpc = ConvaiGRPCAPI.Instance != null;
         RefreshActiveParticipants();
-        bool hasParticipantAudio = _activeParticipants.All(npc => npc == null || npc.AudioManager != null);
+        List<ConvaiNPC> trackedBots = GetTranscriptTrackedBots();
+        bool hasParticipantAudio = trackedBots.All(npc => npc == null || npc.AudioManager != null);
 
         if (!hasInputManager || !hasGrpc || !hasParticipantAudio)
         {
@@ -439,7 +374,7 @@ public class TuringGameManager : MonoBehaviour
         ConvaiInputManager.Instance.talkKeyInteract += HandleTalkKeyInteract;
         ConvaiGRPCAPI.Instance.OnResultReceived += HandleConvaiResultReceived;
 
-        foreach (ConvaiNPC npc in _activeParticipants)
+        foreach (ConvaiNPC npc in trackedBots)
         {
             if (npc == null || npc.AudioManager == null || _npcTranscriptHandlers.ContainsKey(npc))
             {
@@ -481,6 +416,68 @@ public class TuringGameManager : MonoBehaviour
         _npcTranscriptHandlers.Clear();
 
         _runtimeHooksAttached = false;
+    }
+
+    private IEnumerator CapturePlayerSpeechWithoutBotReply(ConvaiNPC listeningNpc, string turnLabel, string instruction, bool logInstruction = false)
+    {
+        if (listeningNpc == null)
+        {
+            yield break;
+        }
+
+        ResetPlayerSpeechCapture();
+        SetTurnCue(turnLabel, instruction);
+        if (logInstruction && !string.IsNullOrWhiteSpace(instruction))
+        {
+            Debug.Log(instruction);
+        }
+
+        if (ConvaiNPCManager.Instance != null)
+        {
+            ConvaiNPCManager.Instance.LockActiveConvaiNPC(listeningNpc);
+        }
+
+        _capturingPlayerSpeech = true;
+
+        float timeout = 0f;
+        while (!_playerPressedTalkKey && timeout < PlayerSpeechTimeoutSeconds)
+        {
+            timeout += Time.deltaTime;
+            yield return null;
+        }
+
+        if (!_playerPressedTalkKey)
+        {
+            Debug.LogWarning("Player did not start speaking in time. Skipping turn.");
+            _capturingPlayerSpeech = false;
+            StopAutomaticNpcReply(listeningNpc);
+            yield break;
+        }
+
+        timeout = 0f;
+        while (!_playerReleasedTalkKey && timeout < PlayerSpeechTimeoutSeconds)
+        {
+            timeout += Time.deltaTime;
+            yield return null;
+        }
+
+        timeout = 0f;
+        while (!_playerSpeechCompleted && timeout < PlayerSpeechTimeoutSeconds)
+        {
+            timeout += Time.deltaTime;
+            yield return null;
+        }
+
+        _capturingPlayerSpeech = false;
+        StopAutomaticNpcReply(listeningNpc);
+    }
+
+    private void StopAutomaticNpcReply(ConvaiNPC listeningNpc)
+    {
+        if (ConvaiGRPCAPI.Instance != null && listeningNpc != null)
+        {
+            ConvaiGRPCAPI.Instance.InterruptCharacterSpeech(listeningNpc);
+        }
     }
 
     private void ResetPlayerSpeechCapture()
@@ -566,6 +563,66 @@ public class TuringGameManager : MonoBehaviour
         ApplyPlayerAlias(playerAlias);
     }
 
+    private void InitializeNarratorVoice()
+    {
+        if (narratorVoice == null && autoUseSingleExtraNpcAsNarrator)
+        {
+            narratorVoice = FindImplicitNarratorVoice();
+        }
+
+        if (narratorVoice == null)
+        {
+            return;
+        }
+
+        if (aiParticipants.Contains(narratorVoice))
+        {
+            Debug.LogWarning("TuringGameManager narratorVoice is also listed in aiParticipants. Ignoring narrator voice.");
+            narratorVoice = null;
+            return;
+        }
+
+        if (!hideNarratorVisuals)
+        {
+            return;
+        }
+
+        foreach (Renderer narratorRenderer in narratorVoice.GetComponentsInChildren<Renderer>(true))
+        {
+            narratorRenderer.enabled = false;
+        }
+
+        foreach (Collider narratorCollider in narratorVoice.GetComponentsInChildren<Collider>(true))
+        {
+            narratorCollider.enabled = false;
+        }
+
+        foreach (Canvas narratorCanvas in narratorVoice.GetComponentsInChildren<Canvas>(true))
+        {
+            narratorCanvas.enabled = false;
+        }
+    }
+
+    private ConvaiNPC FindImplicitNarratorVoice()
+    {
+        List<ConvaiNPC> candidates = Resources.FindObjectsOfTypeAll<ConvaiNPC>()
+            .Where(npc => npc != null && npc.gameObject.scene.IsValid() && !aiParticipants.Contains(npc))
+            .Distinct()
+            .ToList();
+
+        if (candidates.Count == 1)
+        {
+            return candidates[0];
+        }
+
+        if (candidates.Count > 1)
+        {
+            Debug.LogWarning("Multiple non-participant Convai NPCs were found. Assign narratorVoice explicitly to use an unseen narrator.");
+        }
+
+        return null;
+    }
+
     private void ApplyPlayerAlias(string alias)
     {
         string sanitizedAlias = string.IsNullOrWhiteSpace(alias) ? "Player" : alias.Trim();
@@ -603,6 +660,27 @@ public class TuringGameManager : MonoBehaviour
         }
 
         return npc.characterName.Trim();
+    }
+
+    private ConvaiNPC GetClosingNarrator()
+    {
+        if (narratorVoice != null)
+        {
+            return narratorVoice;
+        }
+
+        return _activeParticipants.Count > 0 ? _activeParticipants[0] : null;
+    }
+
+    private List<ConvaiNPC> GetTranscriptTrackedBots()
+    {
+        List<ConvaiNPC> trackedBots = new(_activeParticipants);
+        if (narratorVoice != null && !trackedBots.Contains(narratorVoice))
+        {
+            trackedBots.Add(narratorVoice);
+        }
+
+        return trackedBots;
     }
 
     private string BuildOpeningQuestionPrompt(ConvaiNPC speaker, ConvaiNPC target)
