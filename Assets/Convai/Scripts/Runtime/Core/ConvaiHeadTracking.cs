@@ -13,6 +13,8 @@ namespace Convai.Scripts.Runtime.Core
     [AddComponentMenu("Convai/Character Head & Eye Tracking")]
     public class ConvaiHeadTracking : MonoBehaviour
     {
+        private const float BOUNDS_LOOK_AT_HEIGHT_RATIO = 0.85f;
+        private const float DEFAULT_LOOK_AT_HEIGHT = 1.6f;
         private const float POSITION_UPDATE_DELAY = 2f;
 
         [field: Header("Tracking Properties")]
@@ -55,6 +57,10 @@ namespace Convai.Scripts.Runtime.Core
         private float _appliedBodyLookAtWeight;
         private ConvaiActionsHandler _convaiActionsHandler;
         private float _currentLookAtWeight;
+        private Transform _currentTargetHeadBone;
+        private Collider[] _currentTargetColliders;
+        private Renderer[] _currentTargetRenderers;
+        private Transform _currentTargetRoot;
         private float _desiredLookAtWeight = 1f;
         private Transform _headPivot;
         private bool _isActionRunning;
@@ -115,10 +121,12 @@ namespace Convai.Scripts.Runtime.Core
         }
 
 
-        private void RotateCharacterTowardsTarget()
+        private void RotateCharacterTowardsTarget(Vector3 lookAtPosition)
         {
-            Vector3 toTarget = TargetObject.position - transform.position;
+            Vector3 toTarget = lookAtPosition - transform.position;
             float distance = toTarget.magnitude;
+            if (distance <= Mathf.Epsilon)
+                return;
 
             // Calculate the angle difference between the character's forward direction and the direction towards the target.
             float angleDifference = Vector3.Angle(transform.forward, toTarget);
@@ -133,6 +141,8 @@ namespace Convai.Scripts.Runtime.Core
 
                 // Zero out the y-component (up-down direction) to only rotate on the horizontal plane.
                 targetDirection.y = 0;
+                if (targetDirection.sqrMagnitude <= Mathf.Epsilon)
+                    return;
 
                 Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation,
@@ -166,21 +176,18 @@ namespace Convai.Scripts.Runtime.Core
         /// </summary>
         private void PerformHeadTracking()
         {
-            if (_isActionRunning) return;
+            if (_isActionRunning || TargetObject == null) return;
 
-            float distance = Vector3.Distance(transform.position, TargetObject.position);
-            DrawRayToTarget();
+            Vector3 lookAtPosition = GetTargetLookAtPosition();
+            float distance = Vector3.Distance(transform.position, lookAtPosition);
+            DrawRayToTarget(lookAtPosition);
 
             // only perform head tracking if within threshold distance
             if (!(distance < trackingDistance / 2))
-            {
                 _desiredLookAtWeight = 0;
-                if (_currentLookAtWeight > 0)
-                    SetCurrentLookAtWeight();
-            }
 
+            _headPivot.transform.LookAt(lookAtPosition); // orient the pivot towards the target look-at position
             SetCurrentLookAtWeight();
-            _headPivot.transform.LookAt(TargetObject); // orient the pivot towards the target object
             // set the current look at weight based on how much rotation is needed
 
             // limit the head rotation
@@ -203,8 +210,8 @@ namespace Convai.Scripts.Runtime.Core
             _appliedBodyLookAtWeight = Mathf.Lerp(_appliedBodyLookAtWeight, targetBodyLookAtWeight, Time.deltaTime);
 
             // Apply rotation weights to the Animator
-            RotateCharacterTowardsTarget();
-            AdjustAnimatorLookAt();
+            RotateCharacterTowardsTarget(lookAtPosition);
+            AdjustAnimatorLookAt(lookAtPosition);
         }
 
         /// <summary>
@@ -224,13 +231,14 @@ namespace Convai.Scripts.Runtime.Core
         /// <summary>
         ///     Method to apply rotation weights to the Animator
         /// </summary>
-        private void AdjustAnimatorLookAt()
+        private void AdjustAnimatorLookAt(Vector3 lookAtPosition)
         {
             // Check if Animator or TargetObject are null
             if (!_animator || TargetObject == null)
             {
                 // If either is null, set the look-at weight to 0 and return, effectively ending the method early
-                _animator.SetLookAtWeight(0);
+                if (_animator)
+                    _animator.SetLookAtWeight(0);
                 return;
             }
 
@@ -245,13 +253,13 @@ namespace Convai.Scripts.Runtime.Core
                 Mathf.Clamp(eyesLookAtWeight, 0, 1));
 
             // Set the look-at position for the Animator (where the body/head/eyes will turn toward)
-            _animator.SetLookAtPosition(TargetObject.position);
+            _animator.SetLookAtPosition(lookAtPosition);
         }
 
         /// <summary>
         ///     DebugLog utility to visualize the tracking mechanism
         /// </summary>
-        private void DrawRayToTarget()
+        private void DrawRayToTarget(Vector3 lookAtPosition)
         {
             Vector3 pos = transform.position;
             // Draw a debug ray from our position to the normalized direction towards the target, scaled by half of the tracking distance threshold.
@@ -259,7 +267,115 @@ namespace Convai.Scripts.Runtime.Core
             // "Normalized" ensures that the vector has a magnitude (length) of 1, keeping the scaling of the vector consistent.
             // This ray appears red in the Scene view.
             Debug.DrawRay(pos,
-                (TargetObject.position - pos).normalized * trackingDistance / 2, Color.red);
+                (lookAtPosition - pos).normalized * trackingDistance / 2, Color.red);
+        }
+
+        private Vector3 GetTargetLookAtPosition()
+        {
+            RefreshTargetReferences();
+
+            if (_currentTargetHeadBone)
+                return _currentTargetHeadBone.position;
+
+            if (TryGetTargetBounds(out Bounds targetBounds))
+            {
+                return new Vector3(targetBounds.center.x,
+                    targetBounds.min.y + targetBounds.size.y * BOUNDS_LOOK_AT_HEIGHT_RATIO,
+                    targetBounds.center.z);
+            }
+
+            return TargetObject.position + Vector3.up * DEFAULT_LOOK_AT_HEIGHT;
+        }
+
+        private void RefreshTargetReferences()
+        {
+            if (_currentTargetRoot == TargetObject) return;
+
+            _currentTargetRoot = TargetObject;
+            _currentTargetHeadBone = null;
+            _currentTargetRenderers = null;
+            _currentTargetColliders = null;
+
+            if (TargetObject == null) return;
+
+            Animator targetAnimator = TargetObject.GetComponentInParent<Animator>();
+            if (!targetAnimator)
+                targetAnimator = TargetObject.GetComponentInChildren<Animator>();
+
+            if (targetAnimator && targetAnimator.isHuman)
+            {
+                _currentTargetHeadBone = targetAnimator.GetBoneTransform(HumanBodyBones.Head);
+
+                if (!_currentTargetHeadBone)
+                    _currentTargetHeadBone = targetAnimator.GetBoneTransform(HumanBodyBones.Neck);
+
+                if (!_currentTargetHeadBone)
+                    _currentTargetHeadBone = targetAnimator.GetBoneTransform(HumanBodyBones.UpperChest);
+
+                if (!_currentTargetHeadBone)
+                    _currentTargetHeadBone = targetAnimator.GetBoneTransform(HumanBodyBones.Chest);
+            }
+
+            _currentTargetRenderers = TargetObject.GetComponentsInChildren<Renderer>();
+            _currentTargetColliders = TargetObject.GetComponentsInChildren<Collider>();
+        }
+
+        private bool TryGetTargetBounds(out Bounds bounds)
+        {
+            if (TryEncapsulateRendererBounds(_currentTargetRenderers, out bounds))
+                return true;
+
+            return TryEncapsulateColliderBounds(_currentTargetColliders, out bounds);
+        }
+
+        private static bool TryEncapsulateRendererBounds(Renderer[] renderers, out Bounds bounds)
+        {
+            bounds = default;
+            if (renderers == null || renderers.Length == 0)
+                return false;
+
+            bool hasBounds = false;
+            foreach (Renderer renderer in renderers)
+            {
+                if (!renderer)
+                    continue;
+
+                if (!hasBounds)
+                {
+                    bounds = renderer.bounds;
+                    hasBounds = true;
+                    continue;
+                }
+
+                bounds.Encapsulate(renderer.bounds);
+            }
+
+            return hasBounds;
+        }
+
+        private static bool TryEncapsulateColliderBounds(Collider[] colliders, out Bounds bounds)
+        {
+            bounds = default;
+            if (colliders == null || colliders.Length == 0)
+                return false;
+
+            bool hasBounds = false;
+            foreach (Collider collider in colliders)
+            {
+                if (!collider)
+                    continue;
+
+                if (!hasBounds)
+                {
+                    bounds = collider.bounds;
+                    hasBounds = true;
+                    continue;
+                }
+
+                bounds.Encapsulate(collider.bounds);
+            }
+
+            return hasBounds;
         }
 
         public void SetActionRunning(bool newValue)
