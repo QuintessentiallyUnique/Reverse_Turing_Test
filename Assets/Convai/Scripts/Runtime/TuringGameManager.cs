@@ -9,18 +9,6 @@ using Service;
 
 public class TuringGameManager : MonoBehaviour
 {
-    public struct TurnHudState
-    {
-        public string turnLabel;
-        public string instruction;
-        public string playerIdentity;
-        public string phase;
-        public int currentRound;
-        public int totalRounds;
-    }
-
-    public event System.Action<TurnHudState> TurnHudStateChanged;
-
     [Header("AI Participants")]
     public List<ConvaiNPC> aiParticipants = new();
 
@@ -58,8 +46,6 @@ public class TuringGameManager : MonoBehaviour
     private bool _runtimeHooksAttached;
     private string _currentTurnLabel = "";
     private string _currentTurnInstruction = "";
-    private string _currentPhase = "Setup";
-    private int _currentRoundNumber;
     private GUIStyle _overlayBoxStyle;
     private GUIStyle _overlayLabelStyle;
     private ConvaiPlayerDataSO _playerData;
@@ -71,7 +57,6 @@ public class TuringGameManager : MonoBehaviour
     {
         InitializePlayerAlias();
         InitializeNarratorVoice();
-        NotifyHudState();
         StartCoroutine(GameLoop());
     }
 
@@ -101,15 +86,11 @@ public class TuringGameManager : MonoBehaviour
 
         yield return StartCoroutine(WaitForRuntimeDependencies());
         yield return new WaitForSeconds(startDelaySeconds);
-        _currentPhase = "Game Start";
-        _currentRoundNumber = 0;
         SetTurnCue("Game Start", $"Identity: {GetPlayerNameForPrompts()}");
         Debug.Log("--- GAME STARTING ---");
 
         for (int i = 0; i < roundsToPlay; i++)
         {
-            _currentPhase = "Round";
-            _currentRoundNumber = i + 1;
             RefreshActiveParticipants();
             if (_activeParticipants.Count < 2)
             {
@@ -170,7 +151,6 @@ public class TuringGameManager : MonoBehaviour
         }
 
         Debug.Log("--- VOTING PHASE ---");
-        _currentPhase = "Voting";
 
         Dictionary<ConvaiNPC, string> npcVoteSpeeches = new();
         foreach (ConvaiNPC npc in _activeParticipants)
@@ -207,7 +187,6 @@ public class TuringGameManager : MonoBehaviour
 
         Debug.Log("--- GAME OVER ---");
         Debug.Log(outcome);
-        _currentPhase = "Game Over";
 
         ConvaiNPC closingSpeaker = GetClosingNarrator();
         if (closingSpeaker != null)
@@ -789,20 +768,6 @@ public class TuringGameManager : MonoBehaviour
     {
         _currentTurnLabel = label;
         _currentTurnInstruction = instruction;
-        NotifyHudState();
-    }
-
-    private void NotifyHudState()
-    {
-        TurnHudStateChanged?.Invoke(new TurnHudState
-        {
-            turnLabel = _currentTurnLabel,
-            instruction = _currentTurnInstruction,
-            playerIdentity = GetPlayerNameForPrompts(),
-            phase = _currentPhase,
-            currentRound = _currentRoundNumber,
-            totalRounds = roundsToPlay
-        });
     }
 
     private void OnGUI()
