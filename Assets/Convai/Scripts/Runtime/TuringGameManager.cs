@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Convai.Scripts.Runtime.Core;
 using Convai.Scripts.Runtime.PlayerStats;
 using Service;
@@ -20,6 +21,7 @@ public class TuringGameManager : MonoBehaviour
     }
 
     public event System.Action<TurnHudState> TurnHudStateChanged;
+    public event System.Action<bool, string> GameFinished;
 
     [Header("AI Participants")]
     public List<ConvaiNPC> aiParticipants = new();
@@ -27,6 +29,8 @@ public class TuringGameManager : MonoBehaviour
     [Header("Game Settings")]
     public int roundsToPlay = 1;
     public float startDelaySeconds = 3f;
+    [Tooltip("If enabled, the game starts immediately instead of waiting for the start menu.")]
+    public bool autoStartGame = false;
 
     [Header("Player Identity")]
     public string playerAlias = "Player";
@@ -66,13 +70,49 @@ public class TuringGameManager : MonoBehaviour
     private readonly Dictionary<ConvaiNPC, string> _lastNpcSpeeches = new();
     private readonly Dictionary<ConvaiNPC, System.Action<string>> _npcTranscriptHandlers = new();
     private readonly List<ConvaiNPC> _activeParticipants = new();
+    private bool _sessionStarted;
+    private bool _sessionFinished;
+
+    public bool HasGameStarted => _sessionStarted;
+    public bool HasGameFinished => _sessionFinished;
 
     void Start()
     {
         InitializePlayerAlias();
         InitializeNarratorVoice();
         NotifyHudState();
+
+        if (autoStartGame)
+        {
+            BeginGameSession();
+        }
+    }
+
+    public void BeginGameSession()
+    {
+        if (_sessionStarted && !_sessionFinished)
+        {
+            return;
+        }
+
+        _sessionStarted = true;
+        _sessionFinished = false;
+        NotifyHudState();
         StartCoroutine(GameLoop());
+    }
+
+    public void RequestRetryGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void RequestQuitGame()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     private void OnEnable()
@@ -92,10 +132,18 @@ public class TuringGameManager : MonoBehaviour
 
     IEnumerator GameLoop()
     {
+        if (!_sessionStarted)
+        {
+            _sessionStarted = true;
+        }
+
+        _sessionFinished = false;
         RefreshActiveParticipants();
         if (_activeParticipants.Count < 2)
         {
             Debug.LogWarning("TuringGameManager needs at least two AI participants.");
+            _sessionFinished = true;
+            GameFinished?.Invoke(false, "Game setup error: at least two AI participants are required.");
             yield break;
         }
 
@@ -114,6 +162,8 @@ public class TuringGameManager : MonoBehaviour
             if (_activeParticipants.Count < 2)
             {
                 Debug.LogWarning("TuringGameManager lost required AI participants during play.");
+                _sessionFinished = true;
+                GameFinished?.Invoke(false, "Game stopped because required AI participants were missing.");
                 yield break;
             }
 
@@ -222,6 +272,9 @@ public class TuringGameManager : MonoBehaviour
         {
             ConvaiNPCManager.Instance.UnlockActiveConvaiNPC();
         }
+
+        _sessionFinished = true;
+        GameFinished?.Invoke(true, outcome);
     }
 
     IEnumerator RunBotTurn(ConvaiNPC bot, string prompt, System.Action<string> onTranscriptReady = null, string turnLabelOverride = null)
