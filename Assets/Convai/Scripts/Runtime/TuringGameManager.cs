@@ -180,8 +180,8 @@ public class TuringGameManager : MonoBehaviour
             SetTurnCue($"Round {i + 1}/{roundsToPlay}", $"{GetNpcName(openingTarget, "Speaker 2")} answers, then questions {GetPlayerNameForPrompts()}.");
             yield return StartCoroutine(RunValidatedBotTurn(openingTarget,
                 BuildNpcReplyAndAskPlayerPrompt(openingTarget, openingSpeaker, GetLastSpeech(openingSpeaker)),
-                transcript => LooksLikeHellenAnsweredAndAsked(transcript),
-                transcript => BuildHellenRetryPrompt(transcript),
+                transcript => LooksLikeNpcAnsweredAndAskedPlayer(transcript),
+                transcript => BuildNpcReplyAndAskPlayerRetryPrompt(transcript),
                 transcript => SetLastSpeech(openingTarget, transcript)));
 
             ConvaiNPC playerTarget = _activeParticipants.Count > 2 ? _activeParticipants[2] : openingSpeaker;
@@ -567,8 +567,13 @@ public class TuringGameManager : MonoBehaviour
 
     private string ParseVoteTarget(string speech)
     {
-        string normalized = $" {CleanTranscript(speech).ToUpperInvariant()} ";
-        normalized = normalized.Replace(".", " ").Replace(",", " ").Replace("!", " ").Replace("?", " ").Replace(":", " ");
+        string normalized = NormalizeVoteText(CleanTranscript(speech));
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "UNKNOWN";
+        }
+
+        normalized = $" {normalized} ";
         string playerName = $" {GetPlayerNameForPrompts().ToUpperInvariant()} ";
 
         if (normalized.Contains(" I VOTE ") && normalized.Contains(playerName))
@@ -586,6 +591,33 @@ public class TuringGameManager : MonoBehaviour
         }
 
         return "UNKNOWN";
+    }
+
+    private static string NormalizeVoteText(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        StringBuilder builder = new(value.Length);
+        bool previousWasSpace = false;
+
+        foreach (char c in value.ToUpperInvariant())
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                builder.Append(c);
+                previousWasSpace = false;
+            }
+            else if (!previousWasSpace)
+            {
+                builder.Append(' ');
+                previousWasSpace = true;
+            }
+        }
+
+        return builder.ToString().Trim();
     }
 
     private static string CleanTranscript(string transcript)
@@ -772,7 +804,7 @@ public class TuringGameManager : MonoBehaviour
             "Everyone can hear everyone. Do not mention looking, turning, facing, or physical gestures. " +
             $"Your only job right now is to ask {targetName} exactly one sharp question that tests whether {targetName} really matches their own identity, background, memories, or lived experience. " +
             $"Do not ask about your own identity, interests, or expertise. Do not ask about unrelated topics unless they clearly connect to {targetName}. " +
-            $"Do not ask about chess, strategy games, or competition unless {targetName}'s identity clearly relates to those topics. " +
+            $"Avoid narrow domain assumptions unless {targetName}'s identity clearly relates to that domain. " +
             $"The question should help you detect whether {targetName} sounds like the hidden human rather than clean, polished AI. " +
             "Speak naturally in one sentence and ask exactly one direct question.";
     }
@@ -809,7 +841,7 @@ public class TuringGameManager : MonoBehaviour
             $"{previousSpeakerName} just said: \"{previousLine}\" " +
             $"First, answer {previousSpeakerName}'s question briefly and directly. Then, in the same turn, ask {nextTargetName} exactly one direct question that specifically tests whether {nextTargetName}'s identity, background, memories, or lived experience are genuine. " +
             $"Do not ask about your own identity. Do not ask about unrelated topics unless they clearly connect to {nextTargetName}. " +
-            $"Do not ask about chess, strategy games, or competition unless {nextTargetName}'s identity clearly relates to those topics. " +
+            $"Avoid narrow domain assumptions unless {nextTargetName}'s identity clearly relates to that domain. " +
             "Speak naturally in at most two sentences total: one brief answer, then one direct question.";
     }
 
@@ -898,7 +930,7 @@ public class TuringGameManager : MonoBehaviour
         }
     }
 
-    private bool LooksLikeHellenAnsweredAndAsked(string transcript)
+    private bool LooksLikeNpcAnsweredAndAskedPlayer(string transcript)
     {
         string normalized = CleanTranscript(transcript).ToUpperInvariant();
         return normalized.Contains("?") && normalized.Length > 25;
@@ -910,7 +942,7 @@ public class TuringGameManager : MonoBehaviour
         return normalized.Contains("?") && normalized.Length > 25;
     }
 
-    private string BuildHellenRetryPrompt(string failedTranscript)
+    private string BuildNpcReplyAndAskPlayerRetryPrompt(string failedTranscript)
     {
         return
             $"Your last reply did not follow the required structure. You said: \"{failedTranscript}\" " +
@@ -949,7 +981,7 @@ public class TuringGameManager : MonoBehaviour
 
         foreach (ConvaiNPC npc in aiParticipants)
         {
-            if (npc != null && !_activeParticipants.Contains(npc))
+            if (npc != null && npc.isActiveAndEnabled && !_activeParticipants.Contains(npc))
             {
                 _activeParticipants.Add(npc);
             }
