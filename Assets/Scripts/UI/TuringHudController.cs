@@ -151,6 +151,14 @@ public class TuringHudController : MonoBehaviour
         }
 
         string normalized = value.ToLowerInvariant();
-        return normalized.Contains("hold") && normalized.Contains("t");
+        if (!normalized.Contains("hold"))
+        {
+            return false;
+        }
+
+        return normalized.Contains("talk")
+               || normalized.Contains("button")
+               || normalized.Contains("trigger")
+               || normalized.Contains(" t");
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Convai.Scripts.Runtime.Core;
 using Convai.Scripts.Runtime.PlayerStats;
 using Service;
@@ -20,6 +21,7 @@ public class TuringGameManager : MonoBehaviour
     }
 
     public event System.Action<TurnHudState> TurnHudStateChanged;
+    public event System.Action<bool, string> GameFinished;
 
     [Header("AI Participants")]
     public List<ConvaiNPC> aiParticipants = new();
@@ -55,6 +57,7 @@ public class TuringGameManager : MonoBehaviour
     private string _lastCompletedPlayerSpeech = "";
     private ConvaiNPC _botTranscriptTarget;
     private readonly StringBuilder _botTranscriptBuffer = new();
+    private bool _currentBotTranscriptContainsQuestion;
     private bool _runtimeHooksAttached;
     private string _currentTurnLabel = "";
     private string _currentTurnInstruction = "";
@@ -66,13 +69,59 @@ public class TuringGameManager : MonoBehaviour
     private readonly Dictionary<ConvaiNPC, string> _lastNpcSpeeches = new();
     private readonly Dictionary<ConvaiNPC, System.Action<string>> _npcTranscriptHandlers = new();
     private readonly List<ConvaiNPC> _activeParticipants = new();
+    private bool _sessionStarted;
+    private bool _sessionFinished;
+
+    public bool HasGameStarted => _sessionStarted;
+    public bool HasGameFinished => _sessionFinished;
 
     void Start()
     {
+        EnsureRuntimeUiSystems();
+        if (showTurnOverlay && FindFirstObjectByType<TuringHudController>() != null)
+        {
+            showTurnOverlay = false;
+        }
+
         InitializePlayerAlias();
         InitializeNarratorVoice();
         NotifyHudState();
-        StartCoroutine(GameLoop());
+        StartCoroutine(SessionLoop());
+    }
+
+    public void RequestRetryGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void RequestQuitGame()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    private static void EnsureRuntimeUiSystems()
+    {
+        if (FindFirstObjectByType<TuringSessionMenuUI>() != null)
+        {
+            // Session menu is already present.
+        }
+        else
+        {
+            GameObject sessionUiObject = new GameObject("Turing Session Menu UI");
+            sessionUiObject.AddComponent<TuringSessionMenuUI>();
+        }
+
+        if (FindFirstObjectByType<TuringVrIntegration>() != null)
+        {
+            return;
+        }
+
+        GameObject vrObject = new GameObject("Turing VR Integration");
+        vrObject.AddComponent<TuringVrIntegration>();
     }
 
     private void OnEnable()
@@ -90,12 +139,21 @@ public class TuringGameManager : MonoBehaviour
         }
     }
 
+    private IEnumerator SessionLoop()
+    {
+        _sessionStarted = true;
+        _sessionFinished = false;
+        yield return StartCoroutine(GameLoop());
+    }
+
     IEnumerator GameLoop()
     {
         RefreshActiveParticipants();
         if (_activeParticipants.Count < 2)
         {
             Debug.LogWarning("TuringGameManager needs at least two AI participants.");
+            _sessionFinished = true;
+            GameFinished?.Invoke(false, "Game setup error: at least two AI participants are required.");
             yield break;
         }
 
@@ -114,6 +172,8 @@ public class TuringGameManager : MonoBehaviour
             if (_activeParticipants.Count < 2)
             {
                 Debug.LogWarning("TuringGameManager lost required AI participants during play.");
+                _sessionFinished = true;
+                GameFinished?.Invoke(false, "Game stopped because required AI participants were missing.");
                 yield break;
             }
 
@@ -125,20 +185,23 @@ public class TuringGameManager : MonoBehaviour
 
             yield return StartCoroutine(RunBotTurn(openingSpeaker,
                 BuildOpeningQuestionPrompt(openingSpeaker, openingTarget),
-                transcript => SetLastSpeech(openingSpeaker, transcript)));
+                transcript => SetLastSpeech(openingSpeaker, transcript),
+                lookPrimaryTarget: openingTarget.transform));
 
             SetTurnCue($"Round {i + 1}/{roundsToPlay}", $"{GetNpcName(openingTarget, "Speaker 2")} answers, then questions {GetPlayerNameForPrompts()}.");
             yield return StartCoroutine(RunValidatedBotTurn(openingTarget,
                 BuildNpcReplyAndAskPlayerPrompt(openingTarget, openingSpeaker, GetLastSpeech(openingSpeaker)),
                 transcript => LooksLikeHellenAnsweredAndAsked(transcript),
                 transcript => BuildHellenRetryPrompt(transcript),
-                transcript => SetLastSpeech(openingTarget, transcript)));
+                transcript => SetLastSpeech(openingTarget, transcript),
+                lookPrimaryTarget: openingSpeaker.transform,
+                lookSecondaryTarget: GetPlayerLookTargetTransform()));
 
             ConvaiNPC playerTarget = _activeParticipants.Count > 2 ? _activeParticipants[2] : openingSpeaker;
 
             yield return StartCoroutine(HandlePlayerRoundTurn(
                 playerTarget,
-                $"Hold 'T' once. Answer {GetNpcName(openingTarget, "Speaker 2")}, then ask {GetNpcName(playerTarget, "Next Speaker")} one question as {GetPlayerNameForPrompts()}. Everyone hears you, so you do not need to look at anyone."));
+                $"Hold the talk button once (VR controller trigger, or 'T' on keyboard). Answer {GetNpcName(openingTarget, "Speaker 2")}, then ask {GetNpcName(playerTarget, "Next Speaker")} one question as {GetPlayerNameForPrompts()}. Everyone hears you, so you do not need to look at anyone."));
 
             for (int npcIndex = 2; npcIndex < _activeParticipants.Count; npcIndex++)
             {
@@ -152,7 +215,9 @@ public class TuringGameManager : MonoBehaviour
                     BuildNpcReplyAndAskNpcPrompt(currentNpc, previousSpeakerName, previousSpeech, nextTarget),
                     transcript => LooksLikeNpcAnsweredAndAskedTarget(transcript, nextTarget),
                     transcript => BuildNpcRetryPrompt(currentNpc, nextTarget, transcript),
-                    transcript => SetLastSpeech(currentNpc, transcript)));
+                    transcript => SetLastSpeech(currentNpc, transcript),
+                    lookPrimaryTarget: npcIndex == 2 ? GetPlayerLookTargetTransform() : _activeParticipants[npcIndex - 1].transform,
+                    lookSecondaryTarget: nextTarget.transform));
             }
 
             ConvaiNPC finalSpeaker = openingSpeaker;
@@ -166,7 +231,8 @@ public class TuringGameManager : MonoBehaviour
             SetTurnCue($"Round {i + 1}/{roundsToPlay}", $"{GetNpcName(finalSpeaker, "Speaker 1")} gives the final answer.");
             yield return StartCoroutine(RunBotTurn(finalSpeaker,
                 BuildNpcFinalAnswerPrompt(finalSpeaker, finalPreviousSpeakerName, finalPreviousSpeech),
-                transcript => SetLastSpeech(finalSpeaker, transcript)));
+                transcript => SetLastSpeech(finalSpeaker, transcript),
+                lookPrimaryTarget: _activeParticipants.Count == 2 ? GetPlayerLookTargetTransform() : _activeParticipants[_activeParticipants.Count - 1].transform));
         }
 
         Debug.Log("--- VOTING PHASE ---");
@@ -181,12 +247,13 @@ public class TuringGameManager : MonoBehaviour
                 BuildVotePrompt(GetNpcName(npc, "Speaker")),
                 LooksLikeVoteSpeech,
                 transcript => BuildVoteRetryPrompt(GetNpcName(npc, "Speaker"), transcript),
-                transcript => voteSpeech = transcript));
+                transcript => voteSpeech = transcript,
+                lookPrimaryTarget: GetPlayerLookTargetTransform()));
             npcVoteSpeeches[npc] = voteSpeech;
         }
 
         SetTurnCue("Voting", $"Your turn to vote as {GetPlayerNameForPrompts()}.");
-        Debug.Log("YOUR VOTE: Hold 'T' once and say who you vote for and why. Example: 'I vote <name> because ...'");
+        Debug.Log("YOUR VOTE: Hold the talk button once (VR controller trigger, or 'T' on keyboard) and say who you vote for and why. Example: 'I vote <name> because ...'");
         yield return StartCoroutine(CapturePlayerVoteWithoutBotReply(_activeParticipants[0]));
 
         string playerVote = ParseVoteTarget(_lastCompletedPlayerSpeech);
@@ -203,7 +270,7 @@ public class TuringGameManager : MonoBehaviour
 
         string actualImposter = GetActualImposterToken();
         string votedWinner = GetWinningVoteToken(voteCounts, out bool voteTie);
-        string outcome = BuildOutcomeText(actualImposter, votedWinner, voteTie);
+        string outcome = BuildOutcomeText(actualImposter, votedWinner, voteTie, out bool playerWon);
 
         Debug.Log("--- GAME OVER ---");
         Debug.Log(outcome);
@@ -222,9 +289,13 @@ public class TuringGameManager : MonoBehaviour
         {
             ConvaiNPCManager.Instance.UnlockActiveConvaiNPC();
         }
+
+        _sessionFinished = true;
+        GameFinished?.Invoke(playerWon, outcome);
     }
 
-    IEnumerator RunBotTurn(ConvaiNPC bot, string prompt, System.Action<string> onTranscriptReady = null, string turnLabelOverride = null)
+    IEnumerator RunBotTurn(ConvaiNPC bot, string prompt, System.Action<string> onTranscriptReady = null, string turnLabelOverride = null,
+        Transform lookPrimaryTarget = null, Transform lookSecondaryTarget = null)
     {
         if (bot == null)
         {
@@ -239,10 +310,11 @@ public class TuringGameManager : MonoBehaviour
         SetTurnCue(string.IsNullOrWhiteSpace(turnLabelOverride) ? $"{GetNpcName(bot, "Speaker")}'s Turn" : turnLabelOverride, _currentTurnInstruction);
         _botTranscriptTarget = bot;
         _botTranscriptBuffer.Clear();
+        _currentBotTranscriptContainsQuestion = false;
 
         Debug.Log($"{bot.characterName} turn.");
         bot.SendTextDataAsync(prompt);
-        yield return StartCoroutine(WaitForBotToFinish(bot));
+        yield return StartCoroutine(WaitForBotToFinish(bot, lookPrimaryTarget, lookSecondaryTarget));
 
         string transcript = CleanTranscript(_botTranscriptBuffer.ToString());
         onTranscriptReady?.Invoke(transcript);
@@ -254,16 +326,18 @@ public class TuringGameManager : MonoBehaviour
         string prompt,
         System.Func<string, bool> validator,
         System.Func<string, string> retryPromptFactory,
-        System.Action<string> onTranscriptReady = null)
+        System.Action<string> onTranscriptReady = null,
+        Transform lookPrimaryTarget = null,
+        Transform lookSecondaryTarget = null)
     {
         string transcript = "";
-        yield return StartCoroutine(RunBotTurn(bot, prompt, value => transcript = value));
+        yield return StartCoroutine(RunBotTurn(bot, prompt, value => transcript = value, lookPrimaryTarget: lookPrimaryTarget, lookSecondaryTarget: lookSecondaryTarget));
 
         if (validator != null && !validator(transcript) && retryPromptFactory != null)
         {
             Debug.LogWarning($"{bot.characterName} missed the expected format. Retrying once.");
             string retryTranscript = "";
-            yield return StartCoroutine(RunBotTurn(bot, retryPromptFactory(transcript), value => retryTranscript = value));
+            yield return StartCoroutine(RunBotTurn(bot, retryPromptFactory(transcript), value => retryTranscript = value, lookPrimaryTarget: lookPrimaryTarget, lookSecondaryTarget: lookSecondaryTarget));
 
             if (!string.IsNullOrWhiteSpace(retryTranscript))
             {
@@ -299,11 +373,12 @@ public class TuringGameManager : MonoBehaviour
             $"Vote as {GetPlayerNameForPrompts()} and explain why."));
     }
 
-    IEnumerator WaitForBotToFinish(ConvaiNPC bot)
+    IEnumerator WaitForBotToFinish(ConvaiNPC bot, Transform lookPrimaryTarget = null, Transform lookSecondaryTarget = null)
     {
         float timeout = 0f;
         while (!bot.isCharacterTalking && timeout < 30f)
         {
+            FaceSpeakerAtTarget(bot, lookPrimaryTarget);
             timeout += Time.deltaTime;
             yield return null;
         }
@@ -316,6 +391,13 @@ public class TuringGameManager : MonoBehaviour
 
         while (bot.isCharacterTalking)
         {
+            Transform activeTarget = lookPrimaryTarget;
+            if (lookSecondaryTarget != null && _currentBotTranscriptContainsQuestion)
+            {
+                activeTarget = lookSecondaryTarget;
+            }
+
+            FaceSpeakerAtTarget(bot, activeTarget);
             yield return null;
         }
 
@@ -364,6 +446,11 @@ public class TuringGameManager : MonoBehaviour
         if (speaker == null || speaker != _botTranscriptTarget || string.IsNullOrWhiteSpace(transcript))
         {
             return;
+        }
+
+        if (transcript.Contains("?"))
+        {
+            _currentBotTranscriptContainsQuestion = true;
         }
 
         if (_botTranscriptBuffer.Length > 0)
@@ -459,10 +546,12 @@ public class TuringGameManager : MonoBehaviour
         }
 
         _capturingPlayerSpeech = true;
+        Transform playerLookTarget = GetPlayerLookTargetTransform();
 
         float timeout = 0f;
         while (!_playerPressedTalkKey && timeout < PlayerSpeechTimeoutSeconds)
         {
+            FaceSpeakerAtTarget(listeningNpc, playerLookTarget);
             timeout += Time.deltaTime;
             yield return null;
         }
@@ -478,6 +567,7 @@ public class TuringGameManager : MonoBehaviour
         timeout = 0f;
         while (!_playerReleasedTalkKey && timeout < PlayerSpeechTimeoutSeconds)
         {
+            FaceSpeakerAtTarget(listeningNpc, playerLookTarget);
             timeout += Time.deltaTime;
             yield return null;
         }
@@ -485,6 +575,7 @@ public class TuringGameManager : MonoBehaviour
         timeout = 0f;
         while (!_playerSpeechCompleted && timeout < PlayerSpeechTimeoutSeconds)
         {
+            FaceSpeakerAtTarget(listeningNpc, playerLookTarget);
             timeout += Time.deltaTime;
             yield return null;
         }
@@ -508,6 +599,36 @@ public class TuringGameManager : MonoBehaviour
         _playerSpeechCompleted = false;
         _playerFinalTranscriptBuffer = "";
         _lastCompletedPlayerSpeech = "";
+    }
+
+    private Transform GetPlayerLookTargetTransform()
+    {
+        if (Camera.main != null)
+        {
+            return Camera.main.transform;
+        }
+
+        Camera anyCamera = FindFirstObjectByType<Camera>();
+        return anyCamera != null ? anyCamera.transform : null;
+    }
+
+    private static void FaceSpeakerAtTarget(ConvaiNPC speaker, Transform target)
+    {
+        if (speaker == null || target == null)
+        {
+            return;
+        }
+
+        Transform speakerTransform = speaker.transform;
+        Vector3 toTarget = target.position - speakerTransform.position;
+        toTarget.y = 0f;
+        if (toTarget.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        Quaternion desiredRotation = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+        speakerTransform.rotation = Quaternion.Slerp(speakerTransform.rotation, desiredRotation, Time.deltaTime * 6f);
     }
 
     private string ParseVoteTarget(string speech)
@@ -957,14 +1078,16 @@ public class TuringGameManager : MonoBehaviour
         return voteTie ? "UNKNOWN" : leaders[0];
     }
 
-    private string BuildOutcomeText(string actualImposter, string votedWinner, bool voteTie)
+    private string BuildOutcomeText(string actualImposter, string votedWinner, bool voteTie, out bool playerWon)
     {
         if (voteTie)
         {
+            playerWon = true;
             return "You win. The AIs did not reach a clear consensus on the hidden human.";
         }
 
         bool impostorCaught = votedWinner == actualImposter;
+        playerWon = !impostorCaught;
         return impostorCaught
             ? "The bots win. They identified the hidden human."
             : "You win. The bots chose the wrong participant.";
