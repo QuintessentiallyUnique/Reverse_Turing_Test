@@ -50,6 +50,7 @@ public class TuringGameManager : MonoBehaviour
     private const string PlayerVoteToken = "PLAYER";
     private const string PlayerNameSaveKey = "PlayerName";
     private const float PlayerSpeechTimeoutSeconds = 30f;
+    private const int PlayerSpeechStartAttempts = 2;
 
     private bool _capturingPlayerSpeech;
     private bool _playerPressedTalkKey;
@@ -223,6 +224,8 @@ public class TuringGameManager : MonoBehaviour
         _currentPhase = "Voting";
 
         Dictionary<ConvaiNPC, string> npcVoteSpeeches = new();
+        Dictionary<ConvaiNPC, string> npcVoteTargets = new();
+        Dictionary<string, int> voteCounts = new();
         foreach (ConvaiNPC npc in _activeParticipants)
         {
             SetTurnCue("Voting", $"{GetNpcName(npc, "Speaker")} is voting.");
@@ -233,27 +236,26 @@ public class TuringGameManager : MonoBehaviour
                 transcript => BuildVoteRetryPrompt(GetNpcName(npc, "Speaker"), transcript),
                 transcript => voteSpeech = transcript));
             npcVoteSpeeches[npc] = voteSpeech;
+
+            string voteTarget = ParseVoteTarget(voteSpeech);
+            npcVoteTargets[npc] = voteTarget;
+            Debug.Log($"{GetNpcName(npc, "Speaker")} voted: {voteTarget}. Speech: {voteSpeech}");
+            AddVote(voteCounts, voteTarget);
         }
 
         SetTurnCue("Voting", $"Your turn to vote as {GetPlayerNameForPrompts()}.");
         Debug.Log("YOUR VOTE: Hold 'T' once and say who you vote for and why. Example: 'I vote <name> because ...'");
         yield return StartCoroutine(CapturePlayerVoteWithoutBotReply(_activeParticipants[0]));
 
+        string playerVoteSpeech = _lastCompletedPlayerSpeech;
         string playerVote = ParseVoteTarget(_lastCompletedPlayerSpeech);
-        Debug.Log($"Player voted: {playerVote}. Speech: {_lastCompletedPlayerSpeech}");
-
-        Dictionary<string, int> voteCounts = new();
-        foreach (KeyValuePair<ConvaiNPC, string> voteEntry in npcVoteSpeeches)
-        {
-            string voteTarget = ParseVoteTarget(voteEntry.Value);
-            Debug.Log($"{GetNpcName(voteEntry.Key, "Speaker")} voted: {voteTarget}. Speech: {voteEntry.Value}");
-            AddVote(voteCounts, voteTarget);
-        }
+        Debug.Log($"Player voted: {playerVote}. Speech: {playerVoteSpeech}");
         AddVote(voteCounts, playerVote);
 
         string actualImposter = GetActualImposterToken();
         string votedWinner = GetWinningVoteToken(voteCounts, out bool voteTie);
-        string outcome = BuildOutcomeText(actualImposter, votedWinner, voteTie);
+        string outcomeSummary = BuildOutcomeText(actualImposter, votedWinner, voteTie);
+        string outcome = BuildOutcomeWithVoteDetails(outcomeSummary, actualImposter, votedWinner, voteTie, npcVoteTargets, npcVoteSpeeches, playerVote, playerVoteSpeech);
 
         Debug.Log("--- GAME OVER ---");
         Debug.Log(outcome);
@@ -262,9 +264,9 @@ public class TuringGameManager : MonoBehaviour
         ConvaiNPC closingSpeaker = GetClosingNarrator();
         if (closingSpeaker != null)
         {
-            SetTurnCue("Game Over", outcome);
+            SetTurnCue("Game Over", outcomeSummary);
             yield return StartCoroutine(RunBotTurn(closingSpeaker,
-                $"The vote is over. Announce this exact result to the room in one short closing sentence: {outcome}",
+                $"The vote is over. Announce this exact result to the room in one short closing sentence: {outcomeSummary}",
                 turnLabelOverride: narratorVoice != null && closingSpeaker == narratorVoice ? "Narrator" : null));
         }
 
@@ -501,51 +503,98 @@ public class TuringGameManager : MonoBehaviour
             yield break;
         }
 
-        ResetPlayerSpeechCapture();
-        SetTurnCue(turnLabel, instruction);
-        if (logInstruction && !string.IsNullOrWhiteSpace(instruction))
-        {
-            Debug.Log(instruction);
-        }
-
         if (ConvaiNPCManager.Instance != null)
         {
             ConvaiNPCManager.Instance.LockActiveConvaiNPC(listeningNpc);
         }
 
-        _capturingPlayerSpeech = true;
-
-        float timeout = 0f;
-        while (!_playerPressedTalkKey && timeout < PlayerSpeechTimeoutSeconds)
+        bool speechCaptured = false;
+        for (int attempt = 1; attempt <= PlayerSpeechStartAttempts && !speechCaptured; attempt++)
         {
-            timeout += Time.deltaTime;
-            yield return null;
-        }
+            ResetPlayerSpeechCapture();
 
-        if (!_playerPressedTalkKey)
-        {
-            Debug.LogWarning("Player did not start speaking in time. Skipping turn.");
+            string attemptInstruction = attempt == 1
+                ? instruction
+                : $"{instruction} Retry {attempt - 1}/{PlayerSpeechStartAttempts - 1}: hold 'T', speak, then release.";
+
+            SetTurnCue(turnLabel, attemptInstruction);
+            if (logInstruction && !string.IsNullOrWhiteSpace(attemptInstruction))
+            {
+                Debug.Log(attemptInstruction);
+            }
+
+            _capturingPlayerSpeech = true;
+
+            float timeout = 0f;
+            while (!_playerPressedTalkKey && timeout < PlayerSpeechTimeoutSeconds)
+            {
+                timeout += Time.deltaTime;
+                yield return null;
+            }
+
+            if (!_playerPressedTalkKey)
+            {
+                _capturingPlayerSpeech = false;
+                SetPlayerSpeechTimeoutCue(turnLabel, "no speech start detected", attempt);
+                continue;
+            }
+
+            timeout = 0f;
+            while (!_playerReleasedTalkKey && timeout < PlayerSpeechTimeoutSeconds)
+            {
+                timeout += Time.deltaTime;
+                yield return null;
+            }
+
+            if (!_playerReleasedTalkKey)
+            {
+                _capturingPlayerSpeech = false;
+                SetPlayerSpeechTimeoutCue(turnLabel, "talk button was not released", attempt);
+                continue;
+            }
+
+            timeout = 0f;
+            while (!_playerSpeechCompleted && timeout < PlayerSpeechTimeoutSeconds)
+            {
+                timeout += Time.deltaTime;
+                yield return null;
+            }
+
             _capturingPlayerSpeech = false;
-            StopAutomaticNpcReply(listeningNpc);
-            yield break;
-        }
 
-        timeout = 0f;
-        while (!_playerReleasedTalkKey && timeout < PlayerSpeechTimeoutSeconds)
-        {
-            timeout += Time.deltaTime;
-            yield return null;
-        }
+            if (!_playerSpeechCompleted && string.IsNullOrWhiteSpace(_lastCompletedPlayerSpeech))
+            {
+                _lastCompletedPlayerSpeech = CleanTranscript(_playerFinalTranscriptBuffer);
+            }
 
-        timeout = 0f;
-        while (!_playerSpeechCompleted && timeout < PlayerSpeechTimeoutSeconds)
-        {
-            timeout += Time.deltaTime;
-            yield return null;
+            speechCaptured = !string.IsNullOrWhiteSpace(_lastCompletedPlayerSpeech);
+            if (!speechCaptured)
+            {
+                SetPlayerSpeechTimeoutCue(turnLabel, "no final transcript captured", attempt);
+            }
         }
 
         _capturingPlayerSpeech = false;
         StopAutomaticNpcReply(listeningNpc);
+
+        if (!speechCaptured)
+        {
+            _lastCompletedPlayerSpeech = string.Empty;
+            SetTurnCue(turnLabel, $"{GetPlayerNameForPrompts()} timed out. Turn skipped.");
+        }
+    }
+
+    private void SetPlayerSpeechTimeoutCue(string turnLabel, string reason, int attempt)
+    {
+        if (attempt < PlayerSpeechStartAttempts)
+        {
+            string message = $"{GetPlayerNameForPrompts()} input timeout: {reason}. Prepare to retry.";
+            Debug.LogWarning(message);
+            SetTurnCue(turnLabel, message);
+            return;
+        }
+
+        Debug.LogWarning($"{GetPlayerNameForPrompts()} input timeout: {reason}. Turn skipped.");
     }
 
     private void StopAutomaticNpcReply(ConvaiNPC listeningNpc)
@@ -1055,6 +1104,96 @@ public class TuringGameManager : MonoBehaviour
         return impostorCaught
             ? "The bots win. They identified the hidden human."
             : "You win. The bots chose the wrong participant.";
+    }
+
+    private string BuildOutcomeWithVoteDetails(
+        string baseOutcome,
+        string actualImposter,
+        string votedWinner,
+        bool voteTie,
+        Dictionary<ConvaiNPC, string> npcVoteTargets,
+        Dictionary<ConvaiNPC, string> npcVoteSpeeches,
+        string playerVote,
+        string playerVoteSpeech)
+    {
+        StringBuilder builder = new();
+        builder.Append(baseOutcome);
+        builder.Append("\n\nVote Breakdown:");
+
+        foreach (ConvaiNPC npc in _activeParticipants)
+        {
+            string npcName = GetNpcName(npc, "Speaker");
+            string voteTarget = npcVoteTargets != null && npcVoteTargets.TryGetValue(npc, out string token)
+                ? token
+                : "UNKNOWN";
+            string speech = npcVoteSpeeches != null && npcVoteSpeeches.TryGetValue(npc, out string transcript)
+                ? transcript
+                : string.Empty;
+            string reason = ExtractVoteReason(speech);
+
+            builder.Append($"\n- {npcName} voted {ResolveVoteTokenToName(voteTarget)}");
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                builder.Append($" because {reason}");
+            }
+            builder.Append('.');
+        }
+
+        string playerReason = ExtractVoteReason(playerVoteSpeech);
+        builder.Append($"\n- {GetPlayerNameForPrompts()} voted {ResolveVoteTokenToName(playerVote)}");
+        if (!string.IsNullOrWhiteSpace(playerReason))
+        {
+            builder.Append($" because {playerReason}");
+        }
+        builder.Append('.');
+
+        builder.Append($"\n\nHidden human: {ResolveVoteTokenToName(actualImposter)}.");
+        builder.Append(voteTie
+            ? " No single participant received the most votes."
+            : $" Most votes: {ResolveVoteTokenToName(votedWinner)}.");
+
+        return builder.ToString();
+    }
+
+    private string ResolveVoteTokenToName(string voteToken)
+    {
+        if (voteToken == PlayerVoteToken)
+        {
+            return GetPlayerNameForPrompts();
+        }
+
+        foreach (ConvaiNPC npc in _activeParticipants)
+        {
+            if (GetVoteTokenForNpc(npc) == voteToken)
+            {
+                return GetNpcName(npc, "Speaker");
+            }
+        }
+
+        return "Unknown";
+    }
+
+    private static string ExtractVoteReason(string speech)
+    {
+        string cleaned = CleanTranscript(speech);
+        if (string.IsNullOrWhiteSpace(cleaned))
+        {
+            return string.Empty;
+        }
+
+        int becauseIndex = cleaned.IndexOf("because", System.StringComparison.OrdinalIgnoreCase);
+        if (becauseIndex < 0 || becauseIndex + 7 >= cleaned.Length)
+        {
+            return string.Empty;
+        }
+
+        string reason = cleaned.Substring(becauseIndex + 7).Trim().Trim('"', '.', ' ');
+        if (reason.Length > 140)
+        {
+            reason = reason.Substring(0, 140).TrimEnd() + "...";
+        }
+
+        return reason;
     }
 
     private string BuildConversationSummary()
