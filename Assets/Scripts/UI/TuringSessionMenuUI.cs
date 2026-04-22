@@ -14,6 +14,7 @@ public class TuringSessionMenuUI : MonoBehaviour
     private bool _isPaused;
     private bool _pauseButtonHeldLastFrame;
     private string _resultText = "";
+    private Vector2 _resultScroll;
     private GUIStyle _panelStyle;
     private GUIStyle _titleStyle;
     private GUIStyle _bodyStyle;
@@ -131,6 +132,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         SetPaused(false);
         _didPlayerWin = playerWon;
         _resultText = string.IsNullOrWhiteSpace(outcomeText) ? (playerWon ? "You win." : "You lose.") : outcomeText;
+        _resultScroll = Vector2.zero;
         _showResultPopup = true;
     }
 
@@ -206,8 +208,8 @@ public class TuringSessionMenuUI : MonoBehaviour
 
     private void DrawResultPopup()
     {
-        float width = 480f;
-        float height = 260f;
+        float width = 640f;
+        float height = 420f;
         Rect panelRect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
         GUI.Box(panelRect, GUIContent.none, _panelStyle);
 
@@ -216,7 +218,9 @@ public class TuringSessionMenuUI : MonoBehaviour
         GUILayout.BeginArea(new Rect(panelRect.x + 24f, panelRect.y + 22f, panelRect.width - 48f, panelRect.height - 44f));
         GUILayout.Label(title, _titleStyle);
         GUILayout.Space(8f);
+        _resultScroll = GUILayout.BeginScrollView(_resultScroll, GUILayout.ExpandHeight(true));
         GUILayout.Label(_resultText, _bodyStyle);
+        GUILayout.EndScrollView();
         GUILayout.Space(24f);
         if (GUILayout.Button("Try Again", _buttonStyle, GUILayout.Height(46f)))
         {
