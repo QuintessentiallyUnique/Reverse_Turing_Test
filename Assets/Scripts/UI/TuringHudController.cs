@@ -55,6 +55,8 @@ public class TuringHudController : MonoBehaviour
         {
             rootCanvasGroup = GetComponent<CanvasGroup>();
         }
+
+        _targetAlpha = gameManager != null && gameManager.HasGameStarted ? 1f : 0f;
     }
 
     private void OnEnable()
@@ -102,6 +104,8 @@ public class TuringHudController : MonoBehaviour
 
     private void HandleHudStateChanged(TuringGameManager.TurnHudState state)
     {
+        _targetAlpha = gameManager != null && gameManager.HasGameStarted ? 1f : 0f;
+
         if (phaseText != null)
         {
             phaseText.text = string.IsNullOrWhiteSpace(state.phase) ? "Round" : state.phase;
