@@ -723,14 +723,6 @@ PrefabInstance:
       propertyPath: 'm_Bones.Array.data[0]'
       value: 
       objectReference: {fileID: 0}
-    - target: {fileID: 1508414793250043165, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-      propertyPath: <FacialExpressionData>k__BackingField.JawBone
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 1508414793250043165, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
-      propertyPath: <FacialExpressionData>k__BackingField.TongueBone
-      value: 
-      objectReference: {fileID: 0}
     - target: {fileID: 2639540652976512734, guid: 2a09da1d04f25174da5f37449608e885, type: 3}
       propertyPath: characterID
       value: 9441489e-3755-11f1-b01a-42010a7be02c
