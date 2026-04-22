@@ -55,6 +55,11 @@ public class TuringSessionMenuUI : MonoBehaviour
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
+        else
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
     }
 
     private void OnDisable()
@@ -149,6 +154,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         GUILayout.Space(8f);
         if (GUILayout.Button("Quit", _buttonStyle, GUILayout.Height(42f)))
         {
+            PrepareForSceneTransition();
             gameManager.RequestQuitGame();
         }
 
@@ -191,7 +197,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         GUILayout.Space(8f);
         if (GUILayout.Button("Quit", _buttonStyle, GUILayout.Height(42f)))
         {
-            SetPaused(false);
+            PrepareForSceneTransition();
             gameManager.RequestQuitGame();
         }
 
@@ -214,8 +220,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         GUILayout.Space(24f);
         if (GUILayout.Button("Try Again", _buttonStyle, GUILayout.Height(46f)))
         {
-            SetPaused(false);
-            _showResultPopup = false;
+            PrepareForSceneTransition();
             gameManager.RequestRetryGame();
         }
 
@@ -260,6 +265,17 @@ public class TuringSessionMenuUI : MonoBehaviour
         _isPaused = paused;
         Time.timeScale = paused ? 0f : 1f;
         AudioListener.pause = paused;
+    }
+
+    private void PrepareForSceneTransition()
+    {
+        SetPaused(false);
+        _showResultPopup = false;
+        _pauseButtonHeldLastFrame = false;
+        IsMenuVisible = false;
+        SyncTalkInputLock(false);
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 
     private static void SyncTalkInputLock(bool lockTalkInput)

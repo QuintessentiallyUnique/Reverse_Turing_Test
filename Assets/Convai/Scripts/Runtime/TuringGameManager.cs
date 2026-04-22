@@ -273,8 +273,10 @@ public class TuringGameManager : MonoBehaviour
             ConvaiNPCManager.Instance.UnlockActiveConvaiNPC();
         }
 
+        bool playerWon = votedWinner != actualImposter;
+
         _sessionFinished = true;
-        GameFinished?.Invoke(true, outcome);
+        GameFinished?.Invoke(playerWon, outcome);
     }
 
     IEnumerator RunBotTurn(ConvaiNPC bot, string prompt, System.Action<string> onTranscriptReady = null, string turnLabelOverride = null)
