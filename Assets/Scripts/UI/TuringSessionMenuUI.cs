@@ -18,6 +18,7 @@ public class TuringSessionMenuUI : MonoBehaviour
     private GUIStyle _panelStyle;
     private GUIStyle _titleStyle;
     private GUIStyle _bodyStyle;
+    private GUIStyle _resultBodyStyle;
     private GUIStyle _buttonStyle;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -219,7 +220,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         GUILayout.Label(title, _titleStyle);
         GUILayout.Space(8f);
         _resultScroll = GUILayout.BeginScrollView(_resultScroll, GUILayout.ExpandHeight(true));
-        GUILayout.Label(_resultText, _bodyStyle);
+        GUILayout.Label(_resultText, _resultBodyStyle);
         GUILayout.EndScrollView();
         GUILayout.Space(24f);
         if (GUILayout.Button("Try Again", _buttonStyle, GUILayout.Height(46f)))
@@ -362,6 +363,14 @@ public class TuringSessionMenuUI : MonoBehaviour
             _bodyStyle.alignment = TextAnchor.UpperCenter;
             _bodyStyle.wordWrap = true;
             _bodyStyle.normal.textColor = new Color(0.92f, 0.95f, 1f, 1f);
+        }
+
+        if (_resultBodyStyle == null)
+        {
+            _resultBodyStyle = new GUIStyle(_bodyStyle);
+            _resultBodyStyle.alignment = TextAnchor.UpperLeft;
+            _resultBodyStyle.fontSize = 15;
+            _resultBodyStyle.wordWrap = true;
         }
 
         if (_buttonStyle == null)

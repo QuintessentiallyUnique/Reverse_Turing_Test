@@ -1118,7 +1118,9 @@ public class TuringGameManager : MonoBehaviour
     {
         StringBuilder builder = new();
         builder.Append(baseOutcome);
-        builder.Append("\n\nVote Breakdown:");
+        builder.Append("\n\nVote Breakdown");
+        builder.Append($"\n{TrimForTable("Voter", 16).PadRight(16)} | {TrimForTable("Voted", 16).PadRight(16)} | Reason");
+        builder.Append("\n---------------------------------------------------------------");
 
         foreach (ConvaiNPC npc in _activeParticipants)
         {
@@ -1130,22 +1132,11 @@ public class TuringGameManager : MonoBehaviour
                 ? transcript
                 : string.Empty;
             string reason = ExtractVoteReason(speech);
-
-            builder.Append($"\n- {npcName} voted {ResolveVoteTokenToName(voteTarget)}");
-            if (!string.IsNullOrWhiteSpace(reason))
-            {
-                builder.Append($" because {reason}");
-            }
-            builder.Append('.');
+            builder.Append($"\n{FormatVoteRow(npcName, ResolveVoteTokenToName(voteTarget), reason)}");
         }
 
         string playerReason = ExtractVoteReason(playerVoteSpeech);
-        builder.Append($"\n- {GetPlayerNameForPrompts()} voted {ResolveVoteTokenToName(playerVote)}");
-        if (!string.IsNullOrWhiteSpace(playerReason))
-        {
-            builder.Append($" because {playerReason}");
-        }
-        builder.Append('.');
+        builder.Append($"\n{FormatVoteRow(GetPlayerNameForPrompts(), ResolveVoteTokenToName(playerVote), playerReason)}");
 
         builder.Append($"\n\nHidden human: {ResolveVoteTokenToName(actualImposter)}.");
         builder.Append(voteTie
@@ -1194,6 +1185,31 @@ public class TuringGameManager : MonoBehaviour
         }
 
         return reason;
+    }
+
+    private static string FormatVoteRow(string voterName, string votedName, string reason)
+    {
+        string safeReason = string.IsNullOrWhiteSpace(reason) ? "no clear reason captured" : reason;
+        string voter = TrimForTable(voterName, 16).PadRight(16);
+        string voted = TrimForTable(votedName, 16).PadRight(16);
+        string reasonText = TrimForTable(safeReason, 96);
+        return $"{voter} | {voted} | {reasonText}";
+    }
+
+    private static string TrimForTable(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Unknown";
+        }
+
+        string normalized = value.Trim().Replace('\n', ' ').Replace('\r', ' ');
+        if (normalized.Length <= maxLength)
+        {
+            return normalized;
+        }
+
+        return normalized.Substring(0, maxLength - 3).TrimEnd() + "...";
     }
 
     private string BuildConversationSummary()
