@@ -10,10 +10,10 @@ namespace Convai.Scripts.Runtime.Addons
     /// </summary>
     public class TalkButtonDurationChecker : MonoBehaviour
     {
-        /// <summary>
-        ///     Minimum duration required for a valid talk action.
-        /// </summary>
-        private const float MIN_TALK_DURATION = 0.5f;
+        [Header("Talk Input Validation")]
+        [SerializeField, Min(0.05f)]
+        [Tooltip("Minimum hold time before release is considered intentional speech input.")]
+        private float minTalkDurationSeconds = 0.2f;
 
         /// <summary>
         ///     Flag indicating whether the talk button was released prematurely.
@@ -104,7 +104,7 @@ namespace Convai.Scripts.Runtime.Addons
             isTalkKeyReleasedEarly = false;
 
             // Trigger a notification if the talk button is released before reaching the minimum required duration.
-            if (_timer < MIN_TALK_DURATION)
+            if (_timer < minTalkDurationSeconds)
             {
                 // Check if there is an active ConvaiNPC.
                 if (ConvaiNPCManager.Instance.activeConvaiNPC == null) return;
