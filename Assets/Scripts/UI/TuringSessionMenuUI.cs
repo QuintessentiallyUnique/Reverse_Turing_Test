@@ -87,6 +87,12 @@ public class TuringSessionMenuUI : MonoBehaviour
             return;
         }
 
+        if (gameManager.HasGameFinished && _showResultPopup)
+        {
+            DrawResultPopup();
+            return;
+        }
+
         if (_isPaused)
         {
             DrawPausePopup();
@@ -94,11 +100,6 @@ public class TuringSessionMenuUI : MonoBehaviour
         }
 
         DrawInGameButtons();
-
-        if (gameManager.HasGameFinished && _showResultPopup)
-        {
-            DrawResultPopup();
-        }
     }
 
     private void AttachManager()
