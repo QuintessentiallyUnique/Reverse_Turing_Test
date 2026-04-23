@@ -5,11 +5,12 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
+  - enabled: 1
+    path: Assets/Scenes/ReverseTuringTest.unity
+    guid: 0408ba51ef696ba4887232bb42c95734
+  - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: f2b707dead52f7e488dc88ce86a22b69, type: 2}
-    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 98db13d7eb2111749bc82a062a4149de, type: 2}
   m_UseUCBPForAssetBundles: 0
