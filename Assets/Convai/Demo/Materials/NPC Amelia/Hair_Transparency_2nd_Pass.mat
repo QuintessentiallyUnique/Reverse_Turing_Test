@@ -21,23 +21,26 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Hair_Transparency_2nd_Pass
-  m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
+  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _ALPHABLEND_ON
+  - _ALPHAPREMULTIPLY_ON
+  - _ALPHATEST_ON
+  - _OCCLUSIONMAP
+  - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords:
+  - _ALPHABLEND_ON
   - _ALPHATOMASK_ON
   - _CLIPQUALITY_DITHERED
   - _DISABLE_SSR_TRANSPARENT
   - _DOUBLESIDED_ON
   - _ENABLE_FOG_ON_TRANSPARENT
   - _ENUMCLIPQUALITY_ON_DITHER
-  - _SURFACE_TYPE_TRANSPARENT
   - _TRANSPARENT_WRITES_MOTION_VEC
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 1
+  m_DoubleSidedGI: 0
   m_CustomRenderQueue: 3000
   stringTagMap:
     MotionVector: User
@@ -45,10 +48,16 @@ Material:
   disabledShaderPasses:
   - RayTracingPrepass
   - MOTIONVECTORS
+  - DepthOnly
+  - SHADOWCASTER
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 6a2659f831566ad4ba6f290f51cd1a95, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _BlendMap:
         m_Texture: {fileID: 2800000, guid: f6f0f723d23398f4996e8f22ac4b2694, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -113,6 +122,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: bb33785962eaf034088b3db577f1980d, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SpecGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SpecularMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -121,23 +134,45 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - BOOLEAN_ENABLECOLOR: 0
     - _AOOccludeAll: 0
     - _AOStrength: 1
-    - _AlphaClip: 0.55
+    - _AddPrecomputedVelocity: 0
+    - _AlphaClip: 1
     - _AlphaPower: 1
     - _AlphaRemap: 0.75
+    - _AlphaToMask: 0
     - _BaseColorStrength: 0
+    - _Blend: 0
+    - _BlendModePreserveSpecular: 1
     - _BlendStrength: 1
     - _BumpScale: 1
+    - _ClearCoatMask: 0
+    - _ClearCoatSmoothness: 0
     - _ClipQuality: 1
+    - _Cull: 2
     - _Cutoff: 0.5
+    - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DiffuseStrength: 1
     - _DstBlend: 10
+    - _DstBlendAlpha: 10
     - _EndColorStrength: 1
+    - _EnvironmentReflections: 1
     - _FlowMapFlipGreen: 0
     - _GlobalStrength: 1
     - _GlossMapScale: 1
@@ -156,9 +191,12 @@ Material:
     - _NormalStrength: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.02
+    - _QueueOffset: 0
+    - _ReceiveShadows: 1
     - _RimPower: 4
     - _RimTransmissionIntensity: 7.563482
     - _RootColorStrength: 1
+    - _Smoothness: 0.608
     - _SmoothnessMax: 0.897
     - _SmoothnessMin: 0.42697203
     - _SmoothnessPower: 1
@@ -171,13 +209,18 @@ Material:
     - _SpecularShiftMax: -0.25
     - _SpecularShiftMin: -0.777
     - _SpecularTint: 0.5
-    - _SrcBlend: 5
+    - _SrcBlend: 1
+    - _SrcBlendAlpha: 1
+    - _Surface: 1
     - _Translucency: 0.25
     - _UVSec: 0
     - _VertexColorStrength: 0.802
+    - _WorkflowMode: 1
+    - _XRMotionVectorsPass: 1
     - _ZWrite: 0
     - __dirty: 1
     m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DiffuseColor: {r: 0.99999994, g: 0.99999994, b: 0.99999994, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -188,6 +231,7 @@ Material:
     - _HighlightBColor: {r: 0.56062776, g: 0.52232945, b: 0.48891217, a: 1}
     - _HighlightBDistribution: {r: 0.0948, g: 0.36240003, b: 0.5561, a: 0}
     - _RootColor: {r: 0.34586892, g: 0.31027776, b: 0.27784654, a: 1}
+    - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _SpecularTint: {r: 1, g: 0.9366573, b: 0.8844581, a: 1}
     - _VertexBaseColor: {r: 0.2402475, g: 0.08494474, b: 0, a: 1}
   m_BuildTextureStacks: []
