@@ -23,6 +23,7 @@ public class TuringHudController : MonoBehaviour
     [SerializeField] private float pulseSpeed = 2.25f;
 
     private float _targetAlpha = 1f;
+    private bool _isSubscribed;
 
     public void Configure(
         TuringGameManager manager,
@@ -46,10 +47,7 @@ public class TuringHudController : MonoBehaviour
 
     private void Awake()
     {
-        if (gameManager == null)
-        {
-            gameManager = FindFirstObjectByType<TuringGameManager>();
-        }
+        TryAttachGameManager();
 
         if (rootCanvasGroup == null)
         {
@@ -61,22 +59,21 @@ public class TuringHudController : MonoBehaviour
 
     private void OnEnable()
     {
-        if (gameManager != null)
-        {
-            gameManager.TurnHudStateChanged += HandleHudStateChanged;
-        }
+        TrySubscribeToManager();
     }
 
     private void OnDisable()
     {
-        if (gameManager != null)
-        {
-            gameManager.TurnHudStateChanged -= HandleHudStateChanged;
-        }
+        UnsubscribeFromManager();
     }
 
     private void Update()
     {
+        if (!_isSubscribed)
+        {
+            TrySubscribeToManager();
+        }
+
         if (rootCanvasGroup != null)
         {
             rootCanvasGroup.alpha = Mathf.MoveTowards(rootCanvasGroup.alpha, _targetAlpha, fadeSpeed * Time.deltaTime);
@@ -100,6 +97,37 @@ public class TuringHudController : MonoBehaviour
     public void SetVisible(bool visible)
     {
         _targetAlpha = visible ? 1f : 0f;
+    }
+
+    private void TryAttachGameManager()
+    {
+        if (gameManager == null)
+        {
+            gameManager = FindFirstObjectByType<TuringGameManager>();
+        }
+    }
+
+    private void TrySubscribeToManager()
+    {
+        TryAttachGameManager();
+        if (gameManager == null || _isSubscribed)
+        {
+            return;
+        }
+
+        gameManager.TurnHudStateChanged += HandleHudStateChanged;
+        _isSubscribed = true;
+    }
+
+    private void UnsubscribeFromManager()
+    {
+        if (gameManager == null || !_isSubscribed)
+        {
+            return;
+        }
+
+        gameManager.TurnHudStateChanged -= HandleHudStateChanged;
+        _isSubscribed = false;
     }
 
     private void HandleHudStateChanged(TuringGameManager.TurnHudState state)

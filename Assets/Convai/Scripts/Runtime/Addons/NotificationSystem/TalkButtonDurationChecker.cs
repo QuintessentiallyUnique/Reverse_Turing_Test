@@ -32,6 +32,7 @@ namespace Convai.Scripts.Runtime.Addons
         private void Awake()
         {
             _uiAppearanceSettings = FindObjectOfType<UIAppearanceSettings>();
+            RefreshActiveInputField();
         }
 
         /// <summary>
@@ -40,21 +41,56 @@ namespace Convai.Scripts.Runtime.Addons
         /// </summary>
         private void Update()
         {
+            ConvaiInputManager inputManager = ConvaiInputManager.Instance;
+            if (inputManager == null)
+            {
+                return;
+            }
+
             // Check if the talk button is being held down and increment the timer based on the time passed since the last frame.
-            if (ConvaiInputManager.Instance.IsTalkKeyHeld && !UIUtilities.IsAnyInputFieldFocused()) _timer += Time.deltaTime;
+            if (inputManager.IsTalkKeyHeld && !UIUtilities.IsAnyInputFieldFocused()) _timer += Time.deltaTime;
         }
 
         private void OnEnable()
         {
-            ConvaiNPCManager.Instance.OnActiveNPCChanged += ConvaiNPCManager_OnActiveNPCChanged;
-            _uiAppearanceSettings.OnAppearanceChanged += UIAppearanceSettings_OnAppearanceChanged;
-            ConvaiInputManager.Instance.talkKeyInteract += HandleTalkButtonRelease;
+            ConvaiNPCManager npcManager = ConvaiNPCManager.Instance;
+            if (npcManager != null)
+            {
+                npcManager.OnActiveNPCChanged += ConvaiNPCManager_OnActiveNPCChanged;
+            }
+
+            if (_uiAppearanceSettings != null)
+            {
+                _uiAppearanceSettings.OnAppearanceChanged += UIAppearanceSettings_OnAppearanceChanged;
+            }
+
+            ConvaiInputManager inputManager = ConvaiInputManager.Instance;
+            if (inputManager != null)
+            {
+                inputManager.talkKeyInteract += HandleTalkButtonRelease;
+            }
+
+            RefreshActiveInputField();
         }
 
         private void OnDisable()
         {
-            ConvaiNPCManager.Instance.OnActiveNPCChanged -= ConvaiNPCManager_OnActiveNPCChanged;
-            _uiAppearanceSettings.OnAppearanceChanged -= UIAppearanceSettings_OnAppearanceChanged;
+            ConvaiNPCManager npcManager = ConvaiNPCManager.Instance;
+            if (npcManager != null)
+            {
+                npcManager.OnActiveNPCChanged -= ConvaiNPCManager_OnActiveNPCChanged;
+            }
+
+            if (_uiAppearanceSettings != null)
+            {
+                _uiAppearanceSettings.OnAppearanceChanged -= UIAppearanceSettings_OnAppearanceChanged;
+            }
+
+            ConvaiInputManager inputManager = ConvaiInputManager.Instance;
+            if (inputManager != null)
+            {
+                inputManager.talkKeyInteract -= HandleTalkButtonRelease;
+            }
         }
 
         private void HandleTalkButtonRelease(bool releaseState)
@@ -67,6 +103,12 @@ namespace Convai.Scripts.Runtime.Addons
                 return;
             }
 
+            if (_timer <= 0f)
+            {
+                _timer = 0f;
+                return;
+            }
+
             CheckTalkButtonRelease();
             // Reset the timer for the next talk action.
             _timer = 0;
@@ -74,7 +116,7 @@ namespace Convai.Scripts.Runtime.Addons
 
         private void ConvaiNPCManager_OnActiveNPCChanged(ConvaiNPC convaiNpc)
         {
-            if (convaiNpc == null)
+            if (convaiNpc == null || convaiNpc.playerInteractionManager == null)
             {
                 _activeInputField = null;
                 return;
@@ -85,8 +127,14 @@ namespace Convai.Scripts.Runtime.Addons
 
         private void UIAppearanceSettings_OnAppearanceChanged()
         {
-            ConvaiNPC convaiNpc = ConvaiNPCManager.Instance.activeConvaiNPC;
-            if (convaiNpc == null)
+            RefreshActiveInputField();
+        }
+
+        private void RefreshActiveInputField()
+        {
+            ConvaiNPCManager npcManager = ConvaiNPCManager.Instance;
+            ConvaiNPC convaiNpc = npcManager != null ? npcManager.activeConvaiNPC : null;
+            if (convaiNpc == null || convaiNpc.playerInteractionManager == null)
             {
                 _activeInputField = null;
                 return;
@@ -103,15 +151,24 @@ namespace Convai.Scripts.Runtime.Addons
             // Initialize the flag to false.
             isTalkKeyReleasedEarly = false;
 
+            ConvaiNPCManager npcManager = ConvaiNPCManager.Instance;
+            if (npcManager == null || npcManager.activeConvaiNPC == null)
+            {
+                return;
+            }
+
+            NotificationSystemHandler notificationHandler = NotificationSystemHandler.Instance;
+            if (notificationHandler == null)
+            {
+                return;
+            }
+
             // Trigger a notification if the talk button is released before reaching the minimum required duration.
             if (_timer < minTalkDurationSeconds)
             {
-                // Check if there is an active ConvaiNPC.
-                if (ConvaiNPCManager.Instance.activeConvaiNPC == null) return;
-
                 // Set the flag to true and request a notification.
                 isTalkKeyReleasedEarly = true;
-                NotificationSystemHandler.Instance.NotificationRequest(NotificationType.TalkButtonReleasedEarly);
+                notificationHandler.NotificationRequest(NotificationType.TalkButtonReleasedEarly);
             }
         }
     }

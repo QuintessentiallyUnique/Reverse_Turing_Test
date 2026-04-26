@@ -288,6 +288,8 @@ public class TuringGameManager : MonoBehaviour
             yield break;
         }
 
+        EnsureNpcTranscriptHandler(bot);
+
         if (ConvaiNPCManager.Instance != null)
         {
             ConvaiNPCManager.Instance.LockActiveConvaiNPC(bot);
@@ -454,17 +456,22 @@ public class TuringGameManager : MonoBehaviour
 
         foreach (ConvaiNPC npc in trackedBots)
         {
-            if (npc == null || npc.AudioManager == null || _npcTranscriptHandlers.ContainsKey(npc))
-            {
-                continue;
-            }
-
-            System.Action<string> handler = transcript => HandleBotTranscriptChunk(npc, transcript);
-            npc.AudioManager.OnAudioTranscriptAvailable += handler;
-            _npcTranscriptHandlers[npc] = handler;
+            EnsureNpcTranscriptHandler(npc);
         }
 
         _runtimeHooksAttached = true;
+    }
+
+    private void EnsureNpcTranscriptHandler(ConvaiNPC npc)
+    {
+        if (npc == null || npc.AudioManager == null || _npcTranscriptHandlers.ContainsKey(npc))
+        {
+            return;
+        }
+
+        System.Action<string> handler = transcript => HandleBotTranscriptChunk(npc, transcript);
+        npc.AudioManager.OnAudioTranscriptAvailable += handler;
+        _npcTranscriptHandlers[npc] = handler;
     }
 
     private void UnsubscribeBotAudio()
@@ -501,6 +508,11 @@ public class TuringGameManager : MonoBehaviour
         if (listeningNpc == null)
         {
             yield break;
+        }
+
+        if (!_runtimeHooksAttached)
+        {
+            yield return StartCoroutine(WaitForRuntimeDependencies());
         }
 
         if (ConvaiNPCManager.Instance != null)

@@ -13,6 +13,7 @@ public class TuringSessionMenuUI : MonoBehaviour
     private bool _didPlayerWin;
     private bool _isPaused;
     private bool _pauseButtonHeldLastFrame;
+    private bool _talkInputLocked;
     private string _resultText = "";
     private Vector2 _resultScroll;
     private GUIStyle _panelStyle;
@@ -50,7 +51,7 @@ public class TuringSessionMenuUI : MonoBehaviour
 
         bool menuVisible = !gameManager.HasGameStarted || _isPaused || (gameManager.HasGameFinished && _showResultPopup);
         IsMenuVisible = menuVisible;
-        SyncTalkInputLock(menuVisible);
+        ApplyTalkInputLock(menuVisible);
 
         if (menuVisible)
         {
@@ -68,7 +69,7 @@ public class TuringSessionMenuUI : MonoBehaviour
     {
         IsMenuVisible = false;
         SetPaused(false);
-        SyncTalkInputLock(false);
+        ApplyTalkInputLock(false);
         DetachManager();
     }
 
@@ -233,7 +234,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         GUILayout.Space(8f);
         if (GUILayout.Button("Quit", _buttonStyle, GUILayout.Height(42f)))
         {
-            SetPaused(false);
+            PrepareForSceneTransition();
             gameManager.RequestQuitGame();
         }
 
@@ -279,12 +280,12 @@ public class TuringSessionMenuUI : MonoBehaviour
         _showResultPopup = false;
         _pauseButtonHeldLastFrame = false;
         IsMenuVisible = false;
-        SyncTalkInputLock(false);
+        ApplyTalkInputLock(false);
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
 
-    private static void SyncTalkInputLock(bool lockTalkInput)
+    private void ApplyTalkInputLock(bool lockTalkInput)
     {
         ConvaiInputManager inputManager = ConvaiInputManager.Instance;
         if (inputManager == null)
@@ -292,33 +293,33 @@ public class TuringSessionMenuUI : MonoBehaviour
             return;
         }
 
-        if (lockTalkInput)
+        if (lockTalkInput && !_talkInputLocked)
         {
             inputManager.talkKeyInteract?.Invoke(false);
         }
 
 #if ENABLE_INPUT_SYSTEM
         var talkAction = inputManager.GetTalkKeyAction();
-        if (talkAction == null)
+        if (talkAction != null)
         {
-            return;
-        }
-
-        if (lockTalkInput)
-        {
-            if (talkAction.enabled)
+            if (lockTalkInput)
             {
-                talkAction.Disable();
+                if (talkAction.enabled)
+                {
+                    talkAction.Disable();
+                }
             }
-        }
-        else
-        {
-            if (!talkAction.enabled)
+            else
             {
-                talkAction.Enable();
+                if (!talkAction.enabled)
+                {
+                    talkAction.Enable();
+                }
             }
         }
 #endif
+
+        _talkInputLocked = lockTalkInput;
     }
 
     private static bool IsControllerPauseHeld()
