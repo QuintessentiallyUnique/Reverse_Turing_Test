@@ -356,7 +356,7 @@ MonoBehaviour:
   - {fileID: 1971404758}
   roundsToPlay: 1
   startDelaySeconds: 1
-  playerAlias: Thomas Edison
+  playerAlias: Newton
   syncAliasToConvaiProfile: 1
   showTurnOverlay: 1
   narratorVoice: {fileID: 0}
