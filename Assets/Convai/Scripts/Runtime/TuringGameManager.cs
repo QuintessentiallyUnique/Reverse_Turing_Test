@@ -96,6 +96,19 @@ public class TuringGameManager : MonoBehaviour
             return;
         }
 
+        if (roundsToPlay < 1)
+        {
+            roundsToPlay = 1;
+        }
+
+        if (startDelaySeconds < 0f)
+        {
+            startDelaySeconds = 0f;
+        }
+
+        _lastCompletedPlayerSpeech = string.Empty;
+        _lastNpcSpeeches.Clear();
+
         _sessionStarted = true;
         _sessionFinished = false;
         NotifyHudState();
@@ -104,11 +117,27 @@ public class TuringGameManager : MonoBehaviour
 
     public void RequestRetryGame()
     {
+        Time.timeScale = 1f;
+        AudioListener.pause = false;
+
+        if (ConvaiNPCManager.Instance != null)
+        {
+            ConvaiNPCManager.Instance.UnlockActiveConvaiNPC();
+        }
+
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     public void RequestQuitGame()
     {
+        Time.timeScale = 1f;
+        AudioListener.pause = false;
+
+        if (ConvaiNPCManager.Instance != null)
+        {
+            ConvaiNPCManager.Instance.UnlockActiveConvaiNPC();
+        }
+
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
@@ -513,6 +542,15 @@ public class TuringGameManager : MonoBehaviour
         if (!_runtimeHooksAttached)
         {
             yield return StartCoroutine(WaitForRuntimeDependencies());
+
+            if (!_runtimeHooksAttached)
+            {
+                string message = "Voice capture unavailable: Convai runtime hooks did not initialize.";
+                Debug.LogWarning(message);
+                SetTurnCue(turnLabel, message + " Turn skipped.");
+                _lastCompletedPlayerSpeech = string.Empty;
+                yield break;
+            }
         }
 
         if (ConvaiNPCManager.Instance != null)
