@@ -26,6 +26,10 @@ public class TuringVrIntegration : MonoBehaviour
     [Header("Talk Input")]
     [SerializeField] private bool useVrControllerTalkInput = true;
 
+    [Header("Player Rig")]
+    [SerializeField] private bool snapRigToFloor = true;
+    [SerializeField] private float seatedEyeHeight = 1.6f;
+
     [Header("Controller Visuals")]
     [SerializeField] private bool showControllerVisuals = true;
     [SerializeField] private bool useMetaControllerModels = false;
@@ -40,11 +44,13 @@ public class TuringVrIntegration : MonoBehaviour
     private bool _xrStartInProgress;
     private bool _subtitleConfigured;
     private bool _wasTalkHeldLastFrame;
+    private bool _floorTrackingActive;
     private Camera _mainCamera;
     private Transform _trackingOrigin;
     private Transform _leftControllerVisual;
     private Transform _rightControllerVisual;
     private TuringGameManager _gameManager;
+    private TuringVrSubtitleUI _vrSubtitleUI;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -185,11 +191,68 @@ public class TuringVrIntegration : MonoBehaviour
         useCapsuleFallbackIfModelMissing = true;
 
         DisableDesktopLocomotion();
+        ConfigurePlayerRigForVr();
         ConfigureVrHud();
         EnsureControllerVisuals();
         _subtitleConfigured = TryConfigureSubtitleUi();
 
         _isInitialized = true;
+    }
+
+    private void ConfigurePlayerRigForVr()
+    {
+        _floorTrackingActive = TrySetTrackingOriginMode(TrackingOriginModeFlags.Floor);
+        if (!_floorTrackingActive)
+        {
+            TrySetTrackingOriginMode(TrackingOriginModeFlags.Device);
+        }
+
+        if (_mainCamera == null)
+        {
+            return;
+        }
+
+        Transform rig = _mainCamera.transform.parent;
+        if (rig != null && snapRigToFloor)
+        {
+            float targetY = _floorTrackingActive ? 0f : seatedEyeHeight;
+            Vector3 rigLocal = rig.localPosition;
+            if (!Mathf.Approximately(rigLocal.y, targetY))
+            {
+                rig.localPosition = new Vector3(rigLocal.x, targetY, rigLocal.z);
+            }
+        }
+
+        _mainCamera.transform.localPosition = Vector3.zero;
+        _mainCamera.transform.localRotation = Quaternion.identity;
+    }
+
+    private static bool TrySetTrackingOriginMode(TrackingOriginModeFlags mode)
+    {
+        var subsystems = new System.Collections.Generic.List<XRInputSubsystem>();
+        SubsystemManager.GetSubsystems(subsystems);
+        bool any = false;
+        foreach (XRInputSubsystem subsystem in subsystems)
+        {
+            if (subsystem == null)
+            {
+                continue;
+            }
+
+            TrackingOriginModeFlags supported = subsystem.GetSupportedTrackingOriginModes();
+            if ((supported & mode) == 0)
+            {
+                continue;
+            }
+
+            if (subsystem.TrySetTrackingOriginMode(mode))
+            {
+                subsystem.TryRecenter();
+                any = true;
+            }
+        }
+
+        return any;
     }
 
     private static bool IsVrRuntimeActive()
@@ -439,48 +502,43 @@ public class TuringVrIntegration : MonoBehaviour
 
     private bool TryConfigureSubtitleUi()
     {
-        if (_mainCamera == null || UISaveLoadSystem.Instance == null || ConvaiChatUIHandler.Instance == null)
+        if (_mainCamera == null || ConvaiChatUIHandler.Instance == null)
         {
             return false;
         }
 
-        UISaveLoadSystem.Instance.TranscriptUIActiveStatus = true;
-        UISaveLoadSystem.Instance.UIType = ConvaiChatUIHandler.UIType.Subtitle;
+        if (_vrSubtitleUI == null)
+        {
+            GameObject subtitleObject = new GameObject("Turing VR Subtitle UI", typeof(RectTransform));
+            _vrSubtitleUI = subtitleObject.AddComponent<TuringVrSubtitleUI>();
+        }
+
+        _vrSubtitleUI.Configure(_mainCamera, subtitleDistance, subtitleVerticalOffset, subtitleScale, new Vector2(1400f, 320f));
 
         ConvaiChatUIHandler uiHandler = ConvaiChatUIHandler.Instance;
-        if (!uiHandler.GetUIAppearances.ContainsKey(ConvaiChatUIHandler.UIType.Subtitle))
+        if (uiHandler.GetUIAppearances.TryGetValue(ConvaiChatUIHandler.UIType.Subtitle, out IChatUI existingSubtitleUi)
+            && existingSubtitleUi != null
+            && !ReferenceEquals(existingSubtitleUi, _vrSubtitleUI))
         {
-            return false;
+            existingSubtitleUi.DeactivateUI();
         }
 
-        IChatUI subtitleUi = uiHandler.GetUIAppearances[ConvaiChatUIHandler.UIType.Subtitle];
-        if (subtitleUi == null)
+        uiHandler.GetUIAppearances[ConvaiChatUIHandler.UIType.Subtitle] = _vrSubtitleUI;
+
+        if (UISaveLoadSystem.Instance != null)
         {
-            return false;
+            UISaveLoadSystem.Instance.TranscriptUIActiveStatus = true;
+            UISaveLoadSystem.Instance.UIType = ConvaiChatUIHandler.UIType.Subtitle;
         }
 
         IChatUI currentUi = uiHandler.GetCurrentUI();
-        if (currentUi != subtitleUi)
+        if (!ReferenceEquals(currentUi, _vrSubtitleUI))
         {
             currentUi?.DeactivateUI();
             uiHandler.SetUIType(ConvaiChatUIHandler.UIType.Subtitle);
         }
 
-        subtitleUi.ActivateUI();
-
-        CanvasGroup subtitleCanvasGroup = subtitleUi.GetCanvasGroup();
-        if (subtitleCanvasGroup == null)
-        {
-            return false;
-        }
-
-        Canvas subtitleCanvas = subtitleCanvasGroup.GetComponent<Canvas>();
-        if (subtitleCanvas == null)
-        {
-            return false;
-        }
-
-        ConfigureCanvasForHeadlockedUi(subtitleCanvas, subtitleDistance, 0f, subtitleVerticalOffset, subtitleScale, new Vector2(1600f, 400f));
+        _vrSubtitleUI.ActivateUI();
         return true;
     }
 

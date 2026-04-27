@@ -71,7 +71,7 @@ public static class TuringHudSceneBuilder
         RectTransform instructionRect = GetOrCreateChildRect(panel, "InstructionText");
         SetAnchor(instructionRect, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -95f), new Vector2(524f, 70f));
         TextMeshProUGUI instructionText = GetOrCreateTmpText(instructionRect, "Waiting for the next action.", 18, FontStyles.Normal, new Color(0.88f, 0.93f, 1f, 1f), TextAlignmentOptions.TopLeft);
-        instructionText.enableWordWrapping = true;
+        instructionText.textWrappingMode = TextWrappingModes.Normal;
 
         RectTransform identityRect = GetOrCreateChildRect(panel, "IdentityText");
         SetAnchor(identityRect, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(18f, 12f), new Vector2(320f, 24f));
