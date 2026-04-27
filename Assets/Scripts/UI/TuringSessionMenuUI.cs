@@ -223,7 +223,8 @@ public class TuringSessionMenuUI : MonoBehaviour
             return;
         }
 
-        bool keyboardPausePressed = Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P);
+        UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
+        bool keyboardPausePressed = keyboard != null && (keyboard.escapeKey.wasPressedThisFrame || keyboard.pKey.wasPressedThisFrame);
         if (!keyboardPausePressed && !pauseButtonPressedThisFrame)
         {
             return;
