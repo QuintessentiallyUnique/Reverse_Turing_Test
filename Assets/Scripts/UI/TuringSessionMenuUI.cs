@@ -177,7 +177,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         Rect quitRect = new Rect(Screen.width - 140f, 16f, 124f, 44f);
         if (GUI.Button(quitRect, "Quit", _buttonStyle))
         {
-            SetPaused(false);
+            PrepareForSceneTransition();
             gameManager.RequestQuitGame();
         }
     }
