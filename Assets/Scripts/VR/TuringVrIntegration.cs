@@ -42,6 +42,7 @@ public class TuringVrIntegration : MonoBehaviour
     private bool _isVrActive;
     private bool _isInitialized;
     private bool _xrStartInProgress;
+    private bool _xrInitializationWarningLogged;
     private bool _subtitleConfigured;
     private bool _wasTalkHeldLastFrame;
     private bool _floorTrackingActive;
@@ -100,6 +101,17 @@ public class TuringVrIntegration : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (_mainCamera == null || !_mainCamera.isActiveAndEnabled)
+        {
+            _mainCamera = ResolveMainCamera();
+            _subtitleConfigured = false;
+        }
+
+        if (!_subtitleConfigured)
+        {
+            _subtitleConfigured = TryConfigureSubtitleUi();
+        }
+
         if (!_isInitialized || !_isVrActive)
         {
             return;
@@ -120,7 +132,7 @@ public class TuringVrIntegration : MonoBehaviour
         float timeout = 20f;
         float elapsed = 0f;
 
-        while (!_isInitialized && elapsed < timeout)
+        while (!_isInitialized)
         {
             TryStartXrIfNeeded();
 
@@ -129,14 +141,27 @@ public class TuringVrIntegration : MonoBehaviour
             {
                 TryInitializeForCurrentScene();
             }
+            else
+            {
+                if (_mainCamera == null)
+                {
+                    _mainCamera = ResolveMainCamera();
+                }
+
+                if (!_subtitleConfigured)
+                {
+                    _subtitleConfigured = TryConfigureSubtitleUi();
+                }
+            }
 
             elapsed += 0.25f;
-            yield return new WaitForSeconds(0.25f);
-        }
+            if (elapsed >= timeout && !_xrInitializationWarningLogged)
+            {
+                Debug.LogWarning("TuringVrIntegration: XR runtime did not initialize within timeout. Will keep retrying; subtitles can still attach once the scene camera and Convai UI are available.");
+                _xrInitializationWarningLogged = true;
+            }
 
-        if (!_isInitialized)
-        {
-            Debug.LogWarning("TuringVrIntegration: XR runtime did not initialize within timeout. Head tracking and controller visuals will stay inactive.");
+            yield return new WaitForSeconds(0.25f);
         }
     }
 
@@ -171,11 +196,7 @@ public class TuringVrIntegration : MonoBehaviour
             return;
         }
 
-        _mainCamera = Camera.main;
-        if (_mainCamera == null)
-        {
-            _mainCamera = FindFirstObjectByType<Camera>();
-        }
+        _mainCamera = ResolveMainCamera();
 
         if (_mainCamera == null)
         {
@@ -502,6 +523,11 @@ public class TuringVrIntegration : MonoBehaviour
 
     private bool TryConfigureSubtitleUi()
     {
+        if (_mainCamera == null || !_mainCamera.isActiveAndEnabled)
+        {
+            _mainCamera = ResolveMainCamera();
+        }
+
         if (_mainCamera == null || ConvaiChatUIHandler.Instance == null)
         {
             return false;
@@ -541,6 +567,37 @@ public class TuringVrIntegration : MonoBehaviour
         _vrSubtitleUI.ActivateUI();
         Debug.Log("TuringVrIntegration: installed VR subtitle UI as Convai's active subtitle target.");
         return true;
+    }
+
+    private static Camera ResolveMainCamera()
+    {
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null && mainCamera.isActiveAndEnabled)
+        {
+            return mainCamera;
+        }
+
+        Camera fallback = null;
+        Camera[] cameras = FindObjectsByType<Camera>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        foreach (Camera camera in cameras)
+        {
+            if (camera == null || !camera.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            if (camera.CompareTag("MainCamera"))
+            {
+                return camera;
+            }
+
+            if (fallback == null || (fallback.stereoTargetEye == StereoTargetEyeMask.None && camera.stereoTargetEye != StereoTargetEyeMask.None))
+            {
+                fallback = camera;
+            }
+        }
+
+        return fallback;
     }
 
     private void ConfigureCanvasForHeadlockedUi(Canvas canvas, float distance, float horizontalOffset, float verticalOffset, float scale, Vector2 fallbackSize)
