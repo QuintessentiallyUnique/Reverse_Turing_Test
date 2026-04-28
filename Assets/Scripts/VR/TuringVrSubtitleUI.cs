@@ -70,7 +70,7 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
 
     private void LateUpdate()
     {
-        if (_attachedCamera != null && transform.parent != _attachedCamera.transform)
+        if (_attachedCamera != null)
         {
             ApplyTransform();
         }
@@ -85,6 +85,7 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
 
         _canvas = gameObject.AddComponent<Canvas>();
         _canvas.renderMode = RenderMode.WorldSpace;
+        _canvas.overrideSorting = true;
         _canvas.sortingOrder = 100;
         gameObject.AddComponent<CanvasScaler>();
         GraphicRaycaster raycaster = gameObject.AddComponent<GraphicRaycaster>();
@@ -121,11 +122,13 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
         _speakerText.alignment = TextAlignmentOptions.Left;
         _speakerText.fontSize = 38f;
         _speakerText.fontStyle = FontStyles.Bold;
+        _speakerText.color = Color.white;
         _speakerText.textWrappingMode = TextWrappingModes.NoWrap;
         _speakerText.overflowMode = TextOverflowModes.Ellipsis;
         _speakerText.raycastTarget = false;
         _speakerText.text = string.Empty;
         AssignDefaultFont(_speakerText);
+        AssignOverlayMaterial(_speakerText);
 
         GameObject body = new GameObject("Body", typeof(RectTransform));
         body.transform.SetParent(transform, false);
@@ -138,11 +141,13 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
         _bodyText = body.AddComponent<TextMeshProUGUI>();
         _bodyText.alignment = TextAlignmentOptions.TopLeft;
         _bodyText.fontSize = 46f;
+        _bodyText.color = Color.white;
         _bodyText.textWrappingMode = TextWrappingModes.Normal;
         _bodyText.overflowMode = TextOverflowModes.Ellipsis;
         _bodyText.raycastTarget = false;
         _bodyText.text = string.Empty;
         AssignDefaultFont(_bodyText);
+        AssignOverlayMaterial(_bodyText);
 
         Debug.Log($"TuringVrSubtitleUI: built world-space subtitle canvas (panel {_panelSize.x}x{_panelSize.y}).");
     }
@@ -183,7 +188,11 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
         }
 
         Transform t = transform;
-        t.SetParent(_attachedCamera.transform, false);
+        if (t.parent != _attachedCamera.transform)
+        {
+            t.SetParent(_attachedCamera.transform, false);
+        }
+
         t.localPosition = new Vector3(0f, _verticalOffset, _distance);
         t.localRotation = Quaternion.identity;
         t.localScale = Vector3.one * _scale;
@@ -205,6 +214,7 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
         }
 
         EnsureBuilt();
+        gameObject.SetActive(true);
 
         string trimmed = text.Length > CharacterLimit ? text.Substring(text.Length - CharacterLimit) : text;
         string colorHex = ColorUtility.ToHtmlStringRGB(color);
@@ -220,6 +230,26 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
 
         _canvasGroup.alpha = 1f;
         _fadeRoutine = StartCoroutine(FadeOutAfterDelay());
+    }
+
+    private static void AssignOverlayMaterial(TMP_Text text)
+    {
+        Shader overlayShader = Shader.Find("TextMeshPro/Mobile/Distance Field Overlay");
+        if (overlayShader == null)
+        {
+            overlayShader = Shader.Find("TextMeshPro/Distance Field Overlay");
+        }
+
+        if (overlayShader == null || text.fontMaterial == null)
+        {
+            return;
+        }
+
+        Material material = new Material(text.fontMaterial)
+        {
+            shader = overlayShader
+        };
+        text.fontMaterial = material;
     }
 
     private IEnumerator FadeOutAfterDelay()
