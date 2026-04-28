@@ -32,6 +32,8 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
 
         EnsureBuilt();
         ApplyTransform();
+
+        SetSubtitle("System", "VR subtitles ready", new Color(0.5f, 0.9f, 1f));
     }
 
     public void Initialize(GameObject uiPrefab)
