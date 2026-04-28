@@ -539,6 +539,7 @@ public class TuringVrIntegration : MonoBehaviour
         }
 
         _vrSubtitleUI.ActivateUI();
+        Debug.Log("TuringVrIntegration: installed VR subtitle UI as Convai's active subtitle target.");
         return true;
     }
 

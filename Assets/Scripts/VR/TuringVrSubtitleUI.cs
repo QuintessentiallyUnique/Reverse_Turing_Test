@@ -123,6 +123,7 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
         _speakerText.overflowMode = TextOverflowModes.Ellipsis;
         _speakerText.raycastTarget = false;
         _speakerText.text = string.Empty;
+        AssignDefaultFont(_speakerText);
 
         GameObject body = new GameObject("Body", typeof(RectTransform));
         body.transform.SetParent(transform, false);
@@ -139,6 +140,37 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
         _bodyText.overflowMode = TextOverflowModes.Ellipsis;
         _bodyText.raycastTarget = false;
         _bodyText.text = string.Empty;
+        AssignDefaultFont(_bodyText);
+
+        Debug.Log($"TuringVrSubtitleUI: built world-space subtitle canvas (panel {_panelSize.x}x{_panelSize.y}).");
+    }
+
+    private static void AssignDefaultFont(TMP_Text text)
+    {
+        if (text.font != null)
+        {
+            return;
+        }
+
+        TMP_FontAsset fontAsset = TMP_Settings.defaultFontAsset;
+        if (fontAsset == null)
+        {
+            fontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        }
+
+        if (fontAsset == null)
+        {
+            fontAsset = Resources.Load<TMP_FontAsset>("LiberationSans SDF");
+        }
+
+        if (fontAsset != null)
+        {
+            text.font = fontAsset;
+        }
+        else
+        {
+            Debug.LogWarning("TuringVrSubtitleUI: no TMP default font asset found - subtitles may render blank. Open Window > TextMeshPro > Import TMP Essential Resources.");
+        }
     }
 
     private void ApplyTransform()
@@ -176,6 +208,8 @@ public class TuringVrSubtitleUI : MonoBehaviour, IChatUI
         string colorHex = ColorUtility.ToHtmlStringRGB(color);
         _speakerText.text = $"<color=#{colorHex}>{speaker}</color>";
         _bodyText.text = trimmed;
+
+        Debug.Log($"TuringVrSubtitleUI: {speaker} -> {trimmed}");
 
         if (_fadeRoutine != null)
         {
