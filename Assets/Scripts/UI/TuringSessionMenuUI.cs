@@ -13,13 +13,10 @@ public class TuringSessionMenuUI : MonoBehaviour
     private bool _didPlayerWin;
     private bool _isPaused;
     private bool _pauseButtonHeldLastFrame;
-    private bool _talkInputLocked;
     private string _resultText = "";
-    private Vector2 _resultScroll;
     private GUIStyle _panelStyle;
     private GUIStyle _titleStyle;
     private GUIStyle _bodyStyle;
-    private GUIStyle _resultBodyStyle;
     private GUIStyle _buttonStyle;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -49,19 +46,14 @@ public class TuringSessionMenuUI : MonoBehaviour
 
         HandlePauseInput();
 
-        bool menuVisible = !gameManager.HasGameStarted || _isPaused || (gameManager.HasGameFinished && _showResultPopup);
+        bool shouldLockTalkInput = !gameManager.HasGameStarted || _isPaused || (gameManager.HasGameFinished && _showResultPopup);
+        bool menuVisible = _isPaused || (gameManager.HasGameFinished && _showResultPopup);
         IsMenuVisible = menuVisible;
-        ApplyTalkInputLock(menuVisible);
-
+        SyncTalkInputLock(shouldLockTalkInput);
         if (menuVisible)
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
         }
     }
 
@@ -69,7 +61,7 @@ public class TuringSessionMenuUI : MonoBehaviour
     {
         IsMenuVisible = false;
         SetPaused(false);
-        ApplyTalkInputLock(false);
+        SyncTalkInputLock(false);
         DetachManager();
     }
 
@@ -84,13 +76,6 @@ public class TuringSessionMenuUI : MonoBehaviour
 
         if (!gameManager.HasGameStarted)
         {
-            DrawStartPopup();
-            return;
-        }
-
-        if (gameManager.HasGameFinished && _showResultPopup)
-        {
-            DrawResultPopup();
             return;
         }
 
@@ -101,6 +86,11 @@ public class TuringSessionMenuUI : MonoBehaviour
         }
 
         DrawInGameButtons();
+
+        if (gameManager.HasGameFinished && _showResultPopup)
+        {
+            DrawResultPopup();
+        }
     }
 
     private void AttachManager()
@@ -135,35 +125,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         SetPaused(false);
         _didPlayerWin = playerWon;
         _resultText = string.IsNullOrWhiteSpace(outcomeText) ? (playerWon ? "You win." : "You lose.") : outcomeText;
-        _resultScroll = Vector2.zero;
         _showResultPopup = true;
-    }
-
-    private void DrawStartPopup()
-    {
-        float width = 520f;
-        float height = 280f;
-        Rect panelRect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
-        GUI.Box(panelRect, GUIContent.none, _panelStyle);
-
-        GUILayout.BeginArea(new Rect(panelRect.x + 24f, panelRect.y + 22f, panelRect.width - 48f, panelRect.height - 44f));
-        GUILayout.Label("Reverse Turing Test", _titleStyle);
-        GUILayout.Space(8f);
-        GUILayout.Label("Press Start Game when you are ready. The session will keep the HUD hidden until then.", _bodyStyle);
-        GUILayout.Space(24f);
-        if (GUILayout.Button("Start Game", _buttonStyle, GUILayout.Height(46f)))
-        {
-            gameManager.BeginGameSession();
-        }
-
-        GUILayout.Space(8f);
-        if (GUILayout.Button("Quit", _buttonStyle, GUILayout.Height(42f)))
-        {
-            PrepareForSceneTransition();
-            gameManager.RequestQuitGame();
-        }
-
-        GUILayout.EndArea();
     }
 
     private void DrawInGameButtons()
@@ -202,7 +164,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         GUILayout.Space(8f);
         if (GUILayout.Button("Quit", _buttonStyle, GUILayout.Height(42f)))
         {
-            PrepareForSceneTransition();
+            SetPaused(false);
             gameManager.RequestQuitGame();
         }
 
@@ -211,8 +173,8 @@ public class TuringSessionMenuUI : MonoBehaviour
 
     private void DrawResultPopup()
     {
-        float width = 640f;
-        float height = 420f;
+        float width = 480f;
+        float height = 260f;
         Rect panelRect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
         GUI.Box(panelRect, GUIContent.none, _panelStyle);
 
@@ -221,20 +183,19 @@ public class TuringSessionMenuUI : MonoBehaviour
         GUILayout.BeginArea(new Rect(panelRect.x + 24f, panelRect.y + 22f, panelRect.width - 48f, panelRect.height - 44f));
         GUILayout.Label(title, _titleStyle);
         GUILayout.Space(8f);
-        _resultScroll = GUILayout.BeginScrollView(_resultScroll, GUILayout.ExpandHeight(true));
-        GUILayout.Label(_resultText, _resultBodyStyle);
-        GUILayout.EndScrollView();
+        GUILayout.Label(_resultText, _bodyStyle);
         GUILayout.Space(24f);
         if (GUILayout.Button("Try Again", _buttonStyle, GUILayout.Height(46f)))
         {
-            PrepareForSceneTransition();
+            SetPaused(false);
+            _showResultPopup = false;
             gameManager.RequestRetryGame();
         }
 
         GUILayout.Space(8f);
         if (GUILayout.Button("Quit", _buttonStyle, GUILayout.Height(42f)))
         {
-            PrepareForSceneTransition();
+            SetPaused(false);
             gameManager.RequestQuitGame();
         }
 
@@ -243,9 +204,8 @@ public class TuringSessionMenuUI : MonoBehaviour
 
     private void HandlePauseInput()
     {
-        if (gameManager == null || !gameManager.HasGameStarted || gameManager.HasGameFinished)
+        if (gameManager == null)
         {
-            _pauseButtonHeldLastFrame = false;
             return;
         }
 
@@ -253,7 +213,18 @@ public class TuringSessionMenuUI : MonoBehaviour
         bool pauseButtonPressedThisFrame = pauseButtonHeld && !_pauseButtonHeldLastFrame;
         _pauseButtonHeldLastFrame = pauseButtonHeld;
 
-        bool keyboardPausePressed = Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P);
+        if (!gameManager.HasGameStarted || gameManager.HasGameFinished)
+        {
+            if (_isPaused)
+            {
+                SetPaused(false);
+            }
+
+            return;
+        }
+
+        UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
+        bool keyboardPausePressed = keyboard != null && (keyboard.escapeKey.wasPressedThisFrame || keyboard.pKey.wasPressedThisFrame);
         if (!keyboardPausePressed && !pauseButtonPressedThisFrame)
         {
             return;
@@ -274,18 +245,7 @@ public class TuringSessionMenuUI : MonoBehaviour
         AudioListener.pause = paused;
     }
 
-    private void PrepareForSceneTransition()
-    {
-        SetPaused(false);
-        _showResultPopup = false;
-        _pauseButtonHeldLastFrame = false;
-        IsMenuVisible = false;
-        ApplyTalkInputLock(false);
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-    }
-
-    private void ApplyTalkInputLock(bool lockTalkInput)
+    private static void SyncTalkInputLock(bool lockTalkInput)
     {
         ConvaiInputManager inputManager = ConvaiInputManager.Instance;
         if (inputManager == null)
@@ -293,33 +253,33 @@ public class TuringSessionMenuUI : MonoBehaviour
             return;
         }
 
-        if (lockTalkInput && !_talkInputLocked)
+        if (lockTalkInput)
         {
             inputManager.talkKeyInteract?.Invoke(false);
         }
 
 #if ENABLE_INPUT_SYSTEM
         var talkAction = inputManager.GetTalkKeyAction();
-        if (talkAction != null)
+        if (talkAction == null)
         {
-            if (lockTalkInput)
+            return;
+        }
+
+        if (lockTalkInput)
+        {
+            if (talkAction.enabled)
             {
-                if (talkAction.enabled)
-                {
-                    talkAction.Disable();
-                }
+                talkAction.Disable();
             }
-            else
+        }
+        else
+        {
+            if (!talkAction.enabled)
             {
-                if (!talkAction.enabled)
-                {
-                    talkAction.Enable();
-                }
+                talkAction.Enable();
             }
         }
 #endif
-
-        _talkInputLocked = lockTalkInput;
     }
 
     private static bool IsControllerPauseHeld()
@@ -365,14 +325,6 @@ public class TuringSessionMenuUI : MonoBehaviour
             _bodyStyle.alignment = TextAnchor.UpperCenter;
             _bodyStyle.wordWrap = true;
             _bodyStyle.normal.textColor = new Color(0.92f, 0.95f, 1f, 1f);
-        }
-
-        if (_resultBodyStyle == null)
-        {
-            _resultBodyStyle = new GUIStyle(_bodyStyle);
-            _resultBodyStyle.alignment = TextAnchor.UpperLeft;
-            _resultBodyStyle.fontSize = 15;
-            _resultBodyStyle.wordWrap = true;
         }
 
         if (_buttonStyle == null)
